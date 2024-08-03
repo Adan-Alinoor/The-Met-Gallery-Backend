@@ -1,4 +1,4 @@
-from models import db, User, Artwork
+from models import db, Artwork
 from app import app
 
 def seed_data():
