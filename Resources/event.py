@@ -8,7 +8,8 @@ event_parser = reqparse.RequestParser()
 event_parser.add_argument('title', type=str, required=True, help='Title is required')
 event_parser.add_argument('image_url', type=str, required=True, help='Image is required')
 event_parser.add_argument('description', type=str, required=True, help='Description is required')
-event_parser.add_argument('date', type=str, required=True, help='Date is required (format: DD-MM-YYYY)')
+event_parser.add_argument('start_date', type=str, required=True, help='Start Date is required (format: DD-MM-YYYY)')
+event_parser.add_argument('end_date', type=str, required=True, help='End Date is required (format: DD-MM-YYYY)')
 event_parser.add_argument('user_id', type=int, required=True, help='User ID is required')
 event_parser.add_argument('time', type=str, required=True, help='Time is required (format: HH:MM)')
 event_parser.add_argument('location', type=str, required=True, help='Location is required')
@@ -44,17 +45,18 @@ class EventsResource(Resource):
         event = Events.query.get_or_404(id)
         if event is None:
             return {"error": "Event not found"}, 404
-        
+    
         args = event_parser.parse_args()
 
         event.title = args['title']
         event.image_url = args['image_url']
         event.description = args['description']
-        event.date = datetime.strptime(args['date'], '%d-%m-%Y').date()
+        event.start_date = datetime.strptime(args['start_date'], '%d-%m-%Y').date()
+        event.end_date = datetime.strptime(args['end_date'], '%d-%m-%Y').date()
         event.user_id = args['user_id']
-        event.time = datetime.strptime(args['time'], '%H:%M').time()
+        event.time = datetime.strptime(args['time'], '%H:%M:%S').time()
         event.location = args['location']
-        
+    
         db.session.commit()
         return make_response(jsonify({'message': 'Event updated'}), 200)
 
@@ -63,16 +65,16 @@ class EventsResource(Resource):
         args = event_parser.parse_args()
 
         try:
-            # Parse the date and time fields
-            event_date = datetime.strptime(args['date'], '%d-%m-%Y').date()
-            event_time = datetime.strptime(args['time'], '%H:%M').time()
+            event_date = datetime.strptime(args['start_date'], '%d-%m-%Y').date()
+            event_time = datetime.strptime(args['time'], '%H:%M:%S').time()
             created_at = datetime.now()
 
             new_event = Events(
                 title=args['title'],
                 image_url=args['image_url'],
                 description=args['description'],
-                date=event_date,
+                start_date=event_date,
+                end_date=datetime.strptime(args['end_date'], '%d-%m-%Y').date(),
                 user_id=args['user_id'],
                 time=event_time,
                 created_at=created_at,

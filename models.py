@@ -36,7 +36,8 @@ class Events(db.Model, SerializerMixin):
     title = db.Column(db.String, nullable=False)
     image_url = db.Column(db.String)
     description = db.Column(db.String, nullable=False)
-    date = db.Column(db.Date, nullable=False) 
+    start_date = db.Column(db.Date, nullable=False)  
+    end_date = db.Column(db.Date, nullable=False) 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     time = db.Column(db.Time, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -52,7 +53,8 @@ class Events(db.Model, SerializerMixin):
             'title': self.title,
             'image_url': self.image_url,
             'description': self.description,
-            'date': self.date.isoformat(),
+            'start_date': self.start_date.isoformat(), 
+            'end_date': self.end_date.isoformat(), 
             'user_id': self.user_id,
             'time': self.time.isoformat(),
             'created_at': self.created_at.isoformat(),
