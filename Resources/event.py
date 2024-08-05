@@ -1,5 +1,5 @@
 from flask_restful import Resource, reqparse
-from flask import jsonify, request
+from flask import jsonify, request, make_response
 from datetime import datetime
 from models import db, Events
 
@@ -15,12 +15,10 @@ event_parser.add_argument('location', type=str, required=True, help='Location is
 
 class EventsResource(Resource):
 
-    #Resource for managing events
+    # Resource for managing events
 
     def get(self, id=None):
-
-        ##Get all events or a single event by ID
-
+        # Get all events or a single event by ID
         if id is None:
             # Get all events
             events = Events.query.all()
@@ -33,21 +31,16 @@ class EventsResource(Resource):
             return event.to_dict()
 
     def delete(self, id):
-
-        #Delete an event by ID
-
+        # Delete an event by ID
         event = Events.query.get_or_404(id)
         if event is None:
             return {"error": "Event not found"}, 404
         db.session.delete(event)
         db.session.commit()
-        return jsonify({'message': 'Event deleted'}), 200
+        return make_response(jsonify({'message': 'Event deleted'}), 200)
 
-    
     def put(self, id):
-
-        #Update an event by ID
-
+        # Update an event by ID
         event = Events.query.get_or_404(id)
         if event is None:
             return {"error": "Event not found"}, 404
@@ -63,12 +56,10 @@ class EventsResource(Resource):
         event.location = args['location']
         
         db.session.commit()
-        return jsonify({'message': 'Event updated'}), 200
-    
+        return make_response(jsonify({'message': 'Event updated'}), 200)
+
     def post(self):
-
-        #Create a new event
-
+        # Create a new event
         args = event_parser.parse_args()
 
         try:
@@ -91,7 +82,7 @@ class EventsResource(Resource):
             db.session.add(new_event)
             db.session.commit()
 
-            return jsonify({'message': 'Event added'}), 200
+            return make_response(jsonify({'message': 'Event added'}), 200)
         except Exception as e:
             db.session.rollback()
-            return jsonify({'message': f"An error occurred: {str(e)}"}), 500
+            return make_response(jsonify({'message': f"An error occurred: {str(e)}"}), 500)
