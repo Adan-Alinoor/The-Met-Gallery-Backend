@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy_serializer import SerializerMixin
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -10,6 +11,8 @@ class User(db.Model, SerializerMixin):
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
     cart = db.relationship('Cart', back_populates='user', uselist=False)
+    payments = db.relationship('Payment', back_populates='user')
+    orders = db.relationship('Order', back_populates='user')
 
 class Product(db.Model, SerializerMixin):
     __tablename__ = 'products'
@@ -56,6 +59,7 @@ class CartItem(db.Model, SerializerMixin):
     product = db.relationship('Product')
     cart = db.relationship('Cart', back_populates='items')
     
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -68,3 +72,23 @@ class CartItem(db.Model, SerializerMixin):
             'image': self.image,
             'product': self.product.to_dict()
         }
+        
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    payments = db.relationship('Payment', back_populates='order')
+    user = db.relationship('User', back_populates='orders')
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
+    phone_number = db.Column(db.String(15), nullable=False)
+    transaction_id = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = db.relationship('User', back_populates='payments')
+    order = db.relationship('Order', back_populates='payments')        

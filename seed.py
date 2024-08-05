@@ -30,7 +30,7 @@ def seed_products():
         {
             "title": "Mona Lisa",
             "description": "A portrait of Lisa Gherardini, wife of Francesco del Giocondo, known as the Mona Lisa, painted by Leonardo da Vinci.",
-            "price": 850000000,
+            "price": 2,
             "image": "https://i.ibb.co/yQDhv3z/monalisa.jpg"
         },
         {

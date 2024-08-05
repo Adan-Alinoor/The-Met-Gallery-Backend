@@ -10,6 +10,8 @@ flask-migrate = "*"
 faker = "*"
 flask-restful = "*"
 sqlalchemy-serializer = "*"
+requests = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
