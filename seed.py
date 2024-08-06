@@ -1,10 +1,14 @@
 from models import db, User, Product
 from app import app
 from faker import Faker
+from datetime import datetime
+import logging
 
 # Initialize Faker
 fake = Faker()
 
+# Set logging level for specific modules or hand
+logging.basicConfig(level=logging.INFO)
 
 def seed_users(num_users=10):
     User.query.delete()
@@ -207,10 +211,12 @@ def seed_products():
         db.session.add(product)
     db.session.commit()
 
+
 def seed_all():
     with app.app_context():
         seed_users()
         seed_products()
+      
 
 if __name__ == '__main__':
     seed_all()

@@ -1,10 +1,11 @@
 import base64
+from datetime import datetime
 import os
 from flask import Flask, request, jsonify
 import requests
 from flask_migrate import Migrate
 from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment
+from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem
 import logging
 
 app = Flask(__name__)
@@ -279,6 +280,10 @@ class CheckoutResource(Resource):
         total_amount = 0
         for item in cart.items:
             total_amount += item.price * item.quantity
+            order_item = OrderItem(order_id=order.id, product_id=item.product_id, quantity=item.quantity, price=item.price)
+            db.session.add(order_item)
+
+        db.session.commit()
 
         payment_data = {
             'user_id': user.id,
