@@ -38,5 +38,20 @@ def send_message():
 
     return jsonify({"message": "Message sent"}), 201
 
+@app.route('/messages', methods=['GET'])
+@jwt_required()
+def get_messages():
+    user_id = get_jwt_identity()
+    messages = Message.query.filter((Message.sender == user_id) | (Message.recipient == user_id)).all()
+    
+    return jsonify([{
+        'id': msg.id,
+        'sender': msg.sender,
+        'recipient': msg.recipient,
+        'message': msg.message,
+        'timestamp': msg.timestamp.isoformat()
+    } for msg in messages])
+    
+
 if __name__ == '__main__':
     socketio.run(app, debug=True)
