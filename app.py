@@ -1,8 +1,10 @@
 from flask import Flask, jsonify
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
-from models import db, Events
+from models import db, User, Events, Booking, Ticket
 from Resources.event import EventsResource
+from Resources.ticket import TicketResource
+from Resources.booking import BookingResource
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -29,6 +31,8 @@ class Home(Resource):
 # Add the EventsResource class as a resource to the API
 api.add_resource(Home, '/')
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
+api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
+api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 
 if __name__ == "__main__":
     app.run(debug=True)

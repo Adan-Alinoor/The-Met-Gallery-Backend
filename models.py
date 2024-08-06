@@ -44,8 +44,9 @@ class Events(db.Model, SerializerMixin):
     location = db.Column(db.String, nullable=False)
 
     bookings = db.relationship('Booking', back_populates='event')
+    tickets = db.relationship('Ticket', back_populates='event') 
 
-    serialize_rules = ('-bookings',)
+    serialize_rules = ('-bookings', '-tickets')
 
     def to_dict(self):
         return {
@@ -62,7 +63,7 @@ class Events(db.Model, SerializerMixin):
         }
 
     def __repr__(self):
-        return f"Event('{self.title}', '{self.date}')"
+        return f"Event('{self.title}', '{self.start_date}')"
 
 class Booking(db.Model, SerializerMixin):
     __tablename__ = 'bookings'
@@ -70,14 +71,51 @@ class Booking(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
     status = db.Column(db.String)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='bookings')
     event = db.relationship('Events', back_populates='bookings')
+    ticket = db.relationship('Ticket', back_populates='bookings')
 
-    serialize_only = ('id', 'user_id', 'event_id', 'status', 'created_at')
-    serialize_rules = ('user', 'event')
+    serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
+    serialize_rules = ('user', 'event', 'ticket')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id':self.user_id,
+            'event_id': self.event_id,
+            'ticket_id': self.ticket_id,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
+        }
 
     def __repr__(self):
-        return f"Booking('{self.user_id}', '{self.event_id}')"
+        return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
+
+class Ticket(db.Model, SerializerMixin):
+    __tablename__ = 'tickets'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    
+    event = db.relationship('Events', back_populates='tickets')
+    bookings = db.relationship('Booking', back_populates='ticket')
+
+    serialize_only = ('id', 'event_id', 'price', 'quantity')
+    serialize_rules = ('event', 'bookings')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'event_id': self.event_id,
+            'price': self.price,
+            'quantity': self.quantity
+        }
+
+    def __repr__(self):
+        return f"Ticket('{self.event_id}', '{self.price}', '{self.quantity}')"
