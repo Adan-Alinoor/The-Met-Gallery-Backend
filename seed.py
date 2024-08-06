@@ -1,7 +1,6 @@
 from models import db, User, Product
 from app import app
 from faker import Faker
-from datetime import datetime
 import logging
 
 # Initialize Faker
