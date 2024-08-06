@@ -52,6 +52,19 @@ def get_messages():
         'timestamp': msg.timestamp.isoformat()
     } for msg in messages])
     
+@socketio.on('message')
+def handle_message(msg):
+    print('Message: ' + msg)
+    send(msg, broadcast=True)
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
