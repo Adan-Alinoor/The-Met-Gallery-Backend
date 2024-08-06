@@ -15,6 +15,7 @@ sqlalchemy-serializer = "*"
 sqlalchemy = "*"
 python-dotenv = "*"
 faker = "*"
+requests = "*"
 
 [dev-packages]
 

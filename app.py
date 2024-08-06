@@ -5,6 +5,7 @@ from models import db, User, Events, Booking, Ticket
 from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.booking import BookingResource
+from Resources.admin_ticket import TicketAdminResource
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -33,6 +34,7 @@ api.add_resource(Home, '/')
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
+api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 
 if __name__ == "__main__":
     app.run(debug=True)

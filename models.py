@@ -72,7 +72,7 @@ class Booking(db.Model, SerializerMixin):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
     ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
-    status = db.Column(db.String)
+    status = db.Column(db.String, default='pending')  # e.g., 'Confirmed', 'Cancelled'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='bookings')
@@ -100,8 +100,9 @@ class Ticket(db.Model, SerializerMixin):
     
     id = db.Column(db.Integer, primary_key=True)
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    type_name = db.Column(db.String, nullable=False)  # E.g., 'Regular', 'VIP', 'VVIP'
     price = db.Column(db.Float, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False) # Total quantity of ticket type
     
     event = db.relationship('Events', back_populates='tickets')
     bookings = db.relationship('Booking', back_populates='ticket')
@@ -113,6 +114,7 @@ class Ticket(db.Model, SerializerMixin):
         return {
             'id': self.id,
             'event_id': self.event_id,
+            'type_name': self.type_name,
             'price': self.price,
             'quantity': self.quantity
         }
