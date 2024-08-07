@@ -55,5 +55,62 @@ class Logout(Resource):
         user = User.query.get(user_id)
         return {'message': f"{user.role.capitalize()} logged out successfully"}, 200
 
+class UserResource(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user:
+            return {'message': 'User not found'}, 404
+        
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at
+        })
+
+    @jwt_required()
+    def put(self):
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user:
+            return {'message': 'User not found'}, 404
+
+        args = request.get_json()
+
+        if User.query.filter_by(username=args.get('username')).first() and args.get('username') != user.username:
+            return {'message': 'Username is already taken'}, 400
+
+        user.username = args.get('username', user.username)
+        user.email = args.get('email', user.email)
+        if args.get('password'):
+            user.password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return {'message': str(e)}, 500
+
+        return {'message': 'User updated successfully'}, 200
+
+    @jwt_required()
+    def delete(self):
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user:
+            return {'message': 'User not found'}, 404
+
+        db.session.delete(user)
+        db.session.commit()
+        return {'message': 'User deleted successfully'}, 200
+
+api.add_resource(Signup, '/signup')
+api.add_resource(Login, '/login')
+api.add_resource(Logout, '/logout')
+api.add_resource(UserResource, '/user')
+
 if __name__ == '__main__':
     app.run(debug=True)
