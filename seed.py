@@ -1,18 +1,52 @@
+
 from models import db, Artwork
 from app import app
 
 def seed_data():
+from models import db, User, Product
+from app import app
+from faker import Faker
+import logging
+
+# Initialize Faker
+fake = Faker()
+
+# Set logging level for specific modules or hand
+logging.basicConfig(level=logging.INFO)
+
+def seed_users(num_users=10):
+    User.query.delete()
+    for _ in range(num_users):
+        user = User(
+            username=fake.user_name(),
+            email=fake.email(),
+            password=fake.password()
+        )
+        db.session.add(user)
+    db.session.commit()
+
+def seed_products():
+    Product.query.delete()
+    
     artworks = [
         {
             "title": "Starry Night",
             "description": "A masterpiece by Vincent van Gogh, depicting a dreamy interpretation of the artist's asylum room's sweeping view of Saint-Rémy-de-Provence at night.",
+
             "price": 5000000, 
+
+            "price": 2,
+
             "image": "https://i.ibb.co/484yd5n/Starry-night.jpg"
         },
         {
             "title": "Mona Lisa",
             "description": "A portrait of Lisa Gherardini, wife of Francesco del Giocondo, known as the Mona Lisa, painted by Leonardo da Vinci.",
+
             "price": 850000000,
+
+            "price": 2,
+
             "image": "https://i.ibb.co/yQDhv3z/monalisa.jpg"
         },
         {
@@ -27,6 +61,7 @@ def seed_data():
             "price": 6000000,
             "image": "https://i.ibb.co/kHxK6FV/The-Persistence-of-Memory.jpg"
         },
+
         
         {
         "title": "Girl with a Pearl Earring",
@@ -65,6 +100,45 @@ def seed_data():
         "image": "https://i.ibb.co/5xMc8zq/American-Gothic.jpg"
     },
     {
+
+        {
+            "title": "Girl with a Pearl Earring",
+            "description": "An oil painting by Dutch Golden Age painter Johannes Vermeer, depicting a girl wearing a pearl earring.",
+            "price": 7000000,
+            "image": "https://i.ibb.co/dPz3dHT/girlpearlearing.jpg"
+        },
+        {
+            "title": "The Night Watch",
+            "description": "A painting by Rembrandt, portraying a group of city guards.",
+            "price": 45000000,
+            "image": "https://i.ibb.co/GJCgyrG/The-Night-Watch.jpg"
+        },
+        {
+            "title": "Guernica",
+            "description": "A powerful anti-war painting by Pablo Picasso, reflecting the bombing of Guernica during the Spanish Civil War.",
+            "price": 200000000,
+            "image": "https://i.ibb.co/gVB8SQK/Picasso-Guernica.jpg"
+        },
+        {
+            "title": "The Birth of Venus",
+            "description": "A painting by Sandro Botticelli, depicting the goddess Venus emerging from the sea.",
+            "price": 100000000,
+            "image": "https://i.ibb.co/wwHdp6F/the-venus.jpg"
+        },
+        {
+            "title": "The Kiss",
+            "description": "A painting by Gustav Klimt, representing an intimate embrace.",
+            "price": 150000000,
+            "image": "https://i.ibb.co/PFVyPRw/The-Kiss.jpg"
+        },
+        {
+            "title": "American Gothic",
+            "description": "A painting by Grant Wood, showing a farmer and his daughter standing in front of a house.",
+            "price": 30000000,
+            "image": "https://i.ibb.co/5xMc8zq/American-Gothic.jpg"
+        },
+        {
+
             "title": "The Arnolfini Portrait",
             "description": "A painting by Jan van Eyck, depicting Giovanni di Nicolao di Arnolfini and his wife.",
             "price": 90000000,
@@ -76,7 +150,8 @@ def seed_data():
             "price": 8000000,
             "image": "https://i.ibb.co/zGc8Pmj/waterlilies.jpg"
         },
-       
+
+
         {
             "title": "The Last Supper",
             "description": "A late 15th-century mural painting by Leonardo da Vinci, housed by the Convent of Santa Maria delle Grazie in Milan.",
@@ -141,7 +216,11 @@ def seed_data():
             "title": "The Night Café",
             "description": "An oil painting created by Dutch artist Vincent van Gogh in 1888, depicting a night café in Arles.",
             "price": 40000000,
+
             "image": "https://i.ibb.co/qg7YZBF/Vincent-Willem-van-Gogh-076.jpg"
+
+            "image": "https://i.ibb.co/qg7YZBF/Vincent-Willem-van- Gogh-076.jpg"
+
         },
         {
             "title": "Impression, Sunrise",
@@ -163,6 +242,7 @@ def seed_data():
         },
         {
             "title": "Bal du moulin de la Galette",
+
             "description": "A painting by the French artist Pierre-Auguste Renoir, showing a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
             "price": 120000000,
             "image": "https://i.ibb.co/1JSBYtJ/Auguste-Renoir.jpg"
@@ -207,3 +287,42 @@ def seed_data():
 
 if __name__ == "__main__":
     seed_data()
+
+            "description": "A painting by French artist Pierre-Auguste Renoir, portraying a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
+            "price": 78000000,
+            "image": "https://i.ibb.co/YT68J2v/1200px-Auguste-Renoir-Le-Moulin-de-la-Galette.jpg"
+        },
+        {
+            "title": "Venus de Milo",
+            "description": "An ancient Greek statue and one of the most famous works of ancient Greek sculpture, attributed to Alexandros of Antioch.",
+            "price": 100000000,
+            "image": "https://i.ibb.co/mTdTV0Q/Venus-de-Milo-Louvre-Ma-399-n2.jpg"
+        },
+        {
+            "title": "The Thinker",
+            "description": "A bronze sculpture by Auguste Rodin, representing a man in sober meditation battling with a powerful internal struggle.",
+            "price": 14000000,
+            "image": "https://i.ibb.co/FwM5Df1/The-Thinker-Auguste-Rodin-1904.jpg"
+        }
+    ]
+    
+    for artwork in artworks:
+        product = Product(
+            name=artwork['title'],
+            description=artwork['description'],
+            price=artwork['price'],
+            image=artwork['image']
+        )
+        db.session.add(product)
+    db.session.commit()
+
+
+def seed_all():
+    with app.app_context():
+        seed_users()
+        seed_products()
+      
+
+if __name__ == '__main__':
+    seed_all()
+
