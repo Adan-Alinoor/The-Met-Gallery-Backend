@@ -1,10 +1,11 @@
 from flask import Flask, jsonify
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
-from models import db, User, Events, Booking, Ticket, Payment
+from models import db, User, Events, Booking, Ticket
 from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.ticket import MpesaCallbackResource
+from Resources.ticket import CheckoutResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 from flask_cors import CORS
@@ -35,6 +36,7 @@ api.add_resource(Home, '/')
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
+api.add_resource(CheckoutResource, '/checkout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 

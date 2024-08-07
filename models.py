@@ -80,8 +80,7 @@ class Booking(db.Model, SerializerMixin):
     user = db.relationship('User', back_populates='bookings')
     event = db.relationship('Events', back_populates='bookings')
     ticket = db.relationship('Ticket', back_populates='bookings')
-    payment = db.relationship('Payment', back_populates='booking') 
-    phone_numbers = db.relationship('PhoneNumbers', back_populates='booking')  # Multiple phone numbers 
+    payments = db.relationship('Payment', back_populates='bookings') 
 
     serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
     serialize_rules = ('user', 'event', 'ticket', 'payment')
@@ -99,14 +98,6 @@ class Booking(db.Model, SerializerMixin):
     def __repr__(self):
         return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
     
-class PhoneNumbers(db.Model,):
-    __tablename__ = 'phones'
-    id = db.Column(db.Integer, primary_key=True)
-    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
-    phone_number = db.Column(db.String(12))
-
-    booking = db.relationship('Booking', back_populates='phone_numbers')
-
 
 
 class Ticket(db.Model, SerializerMixin):
@@ -140,6 +131,7 @@ class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
     amount = db.Column(db.Integer, nullable=False)
     phone_number = db.Column(db.String(15), nullable=False)
     transaction_id = db.Column(db.String(50), nullable=True)
