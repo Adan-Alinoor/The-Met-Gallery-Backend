@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 import requests
 from flask_migrate import Migrate
 from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events
+from models import db, User,  Cart, CartItem, Order, Payment,OrderItem, Artwork, Events
 from Resources.event import EventsResource
 import logging
 
@@ -224,15 +224,15 @@ class CheckoutResource(Resource):
 
         total_amount = 0
         for selected_item in selected_items:
-            product_id = selected_item.get('product_id')
+            artwork_id = selected_item.get('artwork_id')
             quantity = selected_item.get('quantity', 1)
 
-            cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product_id).first()
+            cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
             if not cart_item or cart_item.quantity < quantity:
-                return {'error': f'Invalid quantity for product ID {product_id}'}, 400
+                return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
 
             total_amount += cart_item.price * quantity
-            order_item = OrderItem(order_id=order.id, product_id=product_id, quantity=quantity, price=cart_item.price)
+            order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
             db.session.add(order_item)
 
             # Decrement the quantity or remove the CartItem
@@ -333,35 +333,35 @@ class AddToCartResource(Resource):
             db.session.add(cart)
             db.session.commit()
 
-        # Check if product exists
-        product = Product.query.get(data['product_id'])
-        if not product:
-            return {'error': 'Product not found'}, 404
+        # Check if artwork exists
+        artwork = Artwork.query.get(data['artwork_id'])
+        if not artwork:
+            return {'error': 'artwork not found'}, 404
 
         # Get the quantity to add
         quantity = data.get('quantity', 1)  # Default to 1 if quantity is not provided
 
-        # Check if the product is already in the cart
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product.id).first()
+        # Check if the artwork is already in the cart
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
         if cart_item:
-            # Update the quantity if the product is already in the cart
+            # Update the quantity if the artwork is already in the cart
             cart_item.quantity += quantity  # Adjust quantity increment as needed
         else:
-            # Add new CartItem if the product is not in the cart
+            # Add new CartItem if the artwork is not in the cart
             cart_item = CartItem(
                 cart_id=cart.id,
-                product_id=product.id,
+                artwork_id=artwork.id,
                 quantity=quantity, # Adjust quantity as needed
-                name = product.name,
-                description=product.description,
-                price=product.price,
-                image=product.image
+                name = artwork.name,
+                description=artwork.description,
+                price=artwork.price,
+                image=artwork.image
             )
             db.session.add(cart_item)
 
         db.session.commit()
 
-        return {'message': 'Product added to cart'}, 201
+        return {'message': 'Artwork added to cart'}, 201
 
 
 class RemoveFromCartResource(Resource):
@@ -370,9 +370,9 @@ class RemoveFromCartResource(Resource):
 
         # Find or create user (assuming a user is authenticated and user_id is available)
         user_id = data.get('user_id')  # Adjust this line as per your authentication system
-        product_id = data.get('product_id')
-        if not user_id or not product_id:
-            return {'error': 'User ID and Product ID are required'}, 400
+        artwork_id = data.get('artwork_id')
+        if not user_id or not artwork_id:
+            return {'error': 'User ID and artwork ID are required'}, 400
 
         user = User.query.get(user_id)
         if not user:
@@ -384,9 +384,9 @@ class RemoveFromCartResource(Resource):
             return {'error': 'Cart not found'}, 404
 
         # Find the CartItem to be removed
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product_id).first()
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
-            return {'error': 'Product not found in cart'}, 404
+            return {'error': 'Artwork not found in cart'}, 404
 
         # Decrement the quantity or remove the CartItem
         if cart_item.quantity > 1:
@@ -396,7 +396,7 @@ class RemoveFromCartResource(Resource):
 
         db.session.commit()
 
-        return {'message': 'Product removed from cart'}, 200
+        return {'message': 'Artwork removed from cart'}, 200
 
 
 class ViewCartResource(Resource):
