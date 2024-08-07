@@ -1,16 +1,12 @@
-from flask import Flask,request
-from flask_restful import Api,Resource
-from flask_migrate import Migrate
-from model import db,User
-import bcrypt
 
-# from flask import Flask, request, jsonify
-# from flask_restful import Api, Resource, reqparse
-# from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-# from flask_migrate import Migrate
-# from model import db, User  
-# import bcrypt
-# from auth import admin_required
+
+from flask import Flask, request, jsonify
+from flask_restful import Api, Resource, reqparse
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_migrate import Migrate
+from model import db, User  
+import bcrypt
+from auth import admin_required
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'  
@@ -51,6 +47,13 @@ class Login(Resource):
             return jsonify({'message': f"{user.role.capitalize()} logged in successfully", 'access_token': access_token})
         
         return jsonify({'message': 'Invalid email or password'}), 401
+
+class Logout(Resource):
+    @jwt_required()
+    def post(self):
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        return {'message': f"{user.role.capitalize()} logged out successfully"}, 200
 
 if __name__ == '__main__':
     app.run(debug=True)
