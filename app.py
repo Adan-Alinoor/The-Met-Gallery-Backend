@@ -31,6 +31,26 @@ class Signup(Resource):
         db.session.commit()
 
         return {'message': f"{args['role'].capitalize()} created successfully"}, 201
+    
+
+class Login(Resource):
+    def __init__(self):
+        self.parser = reqparse.RequestParser()
+        self.parser.add_argument('email', type=str, required=True, help='Email cannot be blank')
+        self.parser.add_argument('password', type=str, required=True, help='Password cannot be blank')
+
+    def post(self):
+        args = self.parser.parse_args()
+        email = args['email']
+        password = args['password']
+
+        user = User.query.filter_by(email=email).first()
+        
+        if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+            access_token = create_access_token(identity=user.id)
+            return jsonify({'message': f"{user.role.capitalize()} logged in successfully", 'access_token': access_token})
+        
+        return jsonify({'message': 'Invalid email or password'}), 401
 
 if __name__ == '__main__':
     app.run(debug=True)
