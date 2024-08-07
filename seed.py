@@ -16,6 +16,8 @@ def delete_existing_data():
         User.query.delete()
         Booking.query.delete()
         Ticket.query.delete()
+        Ticket.query.delete()
+        # Payment.query.delete()
 
 def seed_users():
     with app.app_context():

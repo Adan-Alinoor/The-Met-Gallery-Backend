@@ -19,13 +19,15 @@ db = SQLAlchemy(metadata=metadata)
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, nullable=False)
+    username = db.Column(db.String,nullable=False)
     email = db.Column(db.String)
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     role = db.Column(db.String)
 
     bookings = db.relationship('Booking', back_populates='user')
+    payments = db.relationship('Payment', back_populates='user')
+    
 
     serialize_only = ('id', 'username', 'email', 'role')
 
@@ -78,9 +80,11 @@ class Booking(db.Model, SerializerMixin):
     user = db.relationship('User', back_populates='bookings')
     event = db.relationship('Events', back_populates='bookings')
     ticket = db.relationship('Ticket', back_populates='bookings')
+    payment = db.relationship('Payment', back_populates='booking') 
+    phone_numbers = db.relationship('PhoneNumbers', back_populates='booking')  # Multiple phone numbers 
 
     serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
-    serialize_rules = ('user', 'event', 'ticket')
+    serialize_rules = ('user', 'event', 'ticket', 'payment')
 
     def to_dict(self):
         return {
@@ -94,6 +98,16 @@ class Booking(db.Model, SerializerMixin):
 
     def __repr__(self):
         return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
+    
+class PhoneNumbers(db.Model,):
+    __tablename__ = 'phones'
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
+    phone_number = db.Column(db.String(12))
+
+    booking = db.relationship('Booking', back_populates='phone_numbers')
+
+
 
 class Ticket(db.Model, SerializerMixin):
     __tablename__ = 'tickets'
@@ -107,7 +121,7 @@ class Ticket(db.Model, SerializerMixin):
     event = db.relationship('Events', back_populates='tickets')
     bookings = db.relationship('Booking', back_populates='ticket')
 
-    serialize_only = ('id', 'event_id', 'price', 'quantity')
+    serialize_only = ('id', 'event_id', 'type_name', 'price', 'quantity')
     serialize_rules = ('event', 'bookings')
 
     def to_dict(self):
@@ -120,4 +134,21 @@ class Ticket(db.Model, SerializerMixin):
         }
 
     def __repr__(self):
-        return f"Ticket('{self.event_id}', '{self.price}', '{self.quantity}')"
+        return f"Ticket('{self.event_id}', '{self.type_name}', '{self.price}', '{self.quantity}')"
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
+    phone_number = db.Column(db.String(15), nullable=False)
+    transaction_id = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    result_desc = db.Column(db.String(255), nullable=True)
+
+    user = db.relationship('User', back_populates='payments')
+    bookings = db.relationship('Booking', back_populates='payments')
+
+
