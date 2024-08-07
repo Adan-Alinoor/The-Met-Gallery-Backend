@@ -126,6 +126,10 @@ def mpesa_callback():
 
     # Log the incoming callback data for debugging
     logging.debug(f'Callback Data: {data}')
+
+    if not data:
+        logging.error("No data received in callback")
+        return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
     
     # Process the callback data and update payment status
     try:
@@ -137,18 +141,30 @@ def mpesa_callback():
         logging.error(f'Missing key in callback data: {e}')
         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
 
+    # Log the extracted callback data
+    logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+    logging.debug(f'ResultCode: {result_code}')
+    logging.debug(f'ResultDesc: {result_desc}')
+
     # Find the corresponding payment record
     payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
     if payment:
+        logging.debug(f'Payment record found: {payment.id}')
         if result_code == 0:
             payment.status = 'completed'
+            payment.result_desc = result_desc
+            payment.timestamp = datetime.now()
         else:
             payment.status = 'failed'
+            payment.result_desc = result_desc
+            payment.timestamp = datetime.now()
         db.session.commit()
+        logging.debug(f'Payment status updated to: {payment.status}')
         return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
     else:
         logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
+
 
 
 # ... AddToCartResource, RemoveFromCartResource, ViewCartResource, and CheckoutResource classes ...
