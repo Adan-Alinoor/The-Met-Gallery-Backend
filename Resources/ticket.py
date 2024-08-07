@@ -95,7 +95,7 @@ class CheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://f318-102-214-74-3.ngrok-free.app/callback", 
+            "CallBackURL": "https://9dee-197-139-44-10.ngrok-free.app/callback", 
             "AccountReference": f"Booking{booking.id}",
             "TransactionDesc": "Payment for booking"
         }
@@ -171,7 +171,6 @@ class CheckoutResource(Resource):
             'booking_id': booking.id,
             'payment_response': payment_response
         }, 201
-
 
 class MpesaCallbackResource(Resource):
     def post(self):
@@ -260,4 +259,23 @@ class TicketResource(Resource):
         db.session.add(booking)
         db.session.commit()
 
-        return {'message': 'Ticket purchased successfully', 'booking_id': booking.id}, 201
+        # Initiate payment through M-Pesa
+        payment_data = {
+            'user_id': user_id,
+            'booking_id': booking.id,
+            'phone_number': phone_number,
+            'amount': amount
+        }
+
+        # Create an instance of CheckoutResource
+        checkout_resource = CheckoutResource()
+        payment_response = checkout_resource.initiate_mpesa_payment(payment_data)
+
+        if payment_response[1] != 201:
+            return {'error': 'Failed to initiate payment'}, 400
+
+        return {
+            'message': 'Ticket purchased and payment initiated successfully',
+            'booking_id': booking.id,
+            'payment_response': payment_response
+        }, 201
