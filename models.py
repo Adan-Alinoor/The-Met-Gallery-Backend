@@ -105,3 +105,4 @@ class Payment(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user = db.relationship('User', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
+    result_desc = db.Column(db.String(255), nullable=True)

@@ -51,8 +51,78 @@ def generate_password(shortcode, passkey):
     encoded_string = base64.b64encode(data_to_encode.encode())
     return encoded_string.decode('utf-8'), timestamp
 
-class MpesaPaymentResource(Resource):
-    def process_payment(self, payment_data):
+# class MpesaPaymentResource(Resource):
+#     def process_payment(self, payment_data):
+#         user_id = payment_data.get('user_id')
+#         order_id = payment_data.get('order_id')
+#         phone_number = payment_data.get('phone_number')
+#         amount = payment_data.get('amount')
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+#         order = Order.query.get(order_id)
+#         if not order:
+#             return {'error': 'Order not found'}, 404
+
+#         # Create a new Payment record
+#         payment = Payment(user_id=user.id, order_id=order.id, amount=amount, phone_number=phone_number)
+#         db.session.add(payment)
+#         db.session.commit()
+
+#         # Call M-Pesa API to initiate payment
+#         access_token = get_mpesa_access_token()
+#         headers = {
+#             'Authorization': f'Bearer {access_token}',
+#             'Content-Type': 'application/json'
+#         }
+#         password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+#         payload = {
+#             "BusinessShortCode": SHORTCODE,
+#             "Password": password,
+#             "Timestamp": timestamp,
+#             "TransactionType": "CustomerPayBillOnline",
+#             "Amount": amount,
+#             "PartyA": phone_number,
+#             "PartyB": SHORTCODE,
+#             "PhoneNumber": phone_number,
+#             "CallBackURL": "https://ab30-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+#             "AccountReference": f"Order{order.id}",
+#             "TransactionDesc": "Payment for order"
+#         }
+
+#         try:
+#             response = requests.post(
+#                 "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+#                 headers=headers,
+#                 json=payload
+#             )
+
+#             logging.debug(f'M-Pesa API Response: {response.text}')
+#             response_data = response.json()
+#         except requests.exceptions.RequestException as e:
+#             logging.error(f'Error calling M-Pesa API: {e}')
+#             return {'error': 'Failed to connect to M-Pesa API'}, 500
+#         except ValueError:
+#             logging.error(f'Invalid JSON response: {response.text}')
+#             return {'error': 'Invalid response from M-Pesa API'}, 500
+
+#         if response_data.get('ResponseCode') == '0':
+#             payment.transaction_id = response_data['CheckoutRequestID']
+#             payment.status = 'initiated'
+#             db.session.commit()
+#             return {'message': 'Payment initiated successfully'}, 201
+#         else:
+#             return {'error': 'Failed to initiate payment'}, 400
+
+#     def post(self):
+#         data = request.get_json()
+#         return self.process_payment(data)
+
+
+class CheckoutResource(Resource):
+    def initiate_mpesa_payment(self, payment_data):
         user_id = payment_data.get('user_id')
         order_id = payment_data.get('order_id')
         phone_number = payment_data.get('phone_number')
@@ -87,7 +157,7 @@ class MpesaPaymentResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://ab30-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+            "CallBackURL": "https://f318-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -118,7 +188,114 @@ class MpesaPaymentResource(Resource):
 
     def post(self):
         data = request.get_json()
-        return self.process_payment(data)
+
+        user_id = data.get('user_id')
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        cart = Cart.query.filter_by(user_id=user.id).first()
+        if not cart or not cart.items:
+            return {'error': 'Cart is empty'}, 400
+
+        selected_items = data.get('items', [])
+        if not selected_items:
+            return {'error': 'No items selected for checkout'}, 400
+
+        order = Order(user_id=user.id)
+        db.session.add(order)
+        db.session.commit()
+
+        total_amount = 0
+        for selected_item in selected_items:
+            product_id = selected_item.get('product_id')
+            quantity = selected_item.get('quantity', 1)
+
+            cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product_id).first()
+            if not cart_item or cart_item.quantity < quantity:
+                return {'error': f'Invalid quantity for product ID {product_id}'}, 400
+
+            total_amount += cart_item.price * quantity
+            order_item = OrderItem(order_id=order.id, product_id=product_id, quantity=quantity, price=cart_item.price)
+            db.session.add(order_item)
+
+            # Decrement the quantity or remove the CartItem
+            if cart_item.quantity > quantity:
+                cart_item.quantity -= quantity
+            else:
+                db.session.delete(cart_item)
+
+        db.session.commit()
+
+        payment_data = {
+            'user_id': user.id,
+            'order_id': order.id,
+            'phone_number': data.get('phone_number'),
+            'amount': total_amount
+        }
+
+        # Initiate payment through M-Pesa
+        payment_response = self.initiate_mpesa_payment(payment_data)
+
+        if payment_response[1] != 201:
+            return {'error': 'Failed to initiate payment'}, 400
+
+        return {
+            'message': 'Order created and payment initiated successfully',
+            'order_id': order.id,
+            'payment_response': payment_response
+        }, 201
+
+
+
+# @app.route('/callback', methods=['POST'])
+# def mpesa_callback():
+#     data = request.get_json()
+
+#     # Log the incoming callback data for debugging
+#     logging.debug(f'Callback Data: {data}')
+
+#     if not data:
+#         logging.error("No data received in callback")
+#         return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
+    
+#     # Process the callback data and update payment status
+#     try:
+#         stk_callback = data['Body']['stkCallback']
+#         checkout_request_id = stk_callback['CheckoutRequestID']
+#         result_code = stk_callback['ResultCode']
+#         result_desc = stk_callback['ResultDesc']
+#     except KeyError as e:
+#         logging.error(f'Missing key in callback data: {e}')
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
+
+#     # Log the extracted callback data
+#     logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+#     logging.debug(f'ResultCode: {result_code}')
+#     logging.debug(f'ResultDesc: {result_desc}')
+
+#     # Find the corresponding payment record
+#     payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
+#     if payment:
+#         logging.debug(f'Payment record found: {payment.id}')
+#         if result_code == 0:
+#             payment.status = 'completed'
+#             payment.result_desc = result_desc
+#             payment.timestamp = datetime.now()
+#         else:
+#             payment.status = 'failed'
+#             payment.result_desc = result_desc
+#             payment.timestamp = datetime.now()
+#         db.session.commit()
+#         logging.debug(f'Payment status updated to: {payment.status}')
+#         return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
+#     else:
+#         logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
+
 
 @app.route('/callback', methods=['POST'])
 def mpesa_callback():
@@ -152,19 +329,16 @@ def mpesa_callback():
         logging.debug(f'Payment record found: {payment.id}')
         if result_code == 0:
             payment.status = 'completed'
-            payment.result_desc = result_desc
-            payment.timestamp = datetime.now()
         else:
             payment.status = 'failed'
-            payment.result_desc = result_desc
-            payment.timestamp = datetime.now()
+        payment.result_desc = result_desc
+        payment.timestamp = datetime.now()
         db.session.commit()
         logging.debug(f'Payment status updated to: {payment.status}')
         return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
     else:
         logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
-
 
 
 # ... AddToCartResource, RemoveFromCartResource, ViewCartResource, and CheckoutResource classes ...
@@ -273,60 +447,60 @@ class ViewCartResource(Resource):
     
     
 #handles checkout
-class CheckoutResource(Resource):
-    def post(self):
-        data = request.get_json()
+# class CheckoutResource(Resource):
+#     def post(self):
+#         data = request.get_json()
 
-        user_id = data.get('user_id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+#         user_id = data.get('user_id')
+#         if not user_id:
+#             return {'error': 'User ID is required'}, 400
 
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
 
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart or not cart.items:
-            return {'error': 'Cart is empty'}, 400
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart or not cart.items:
+#             return {'error': 'Cart is empty'}, 400
 
-        order = Order(user_id=user.id)
-        db.session.add(order)
-        db.session.commit()
+#         order = Order(user_id=user.id)
+#         db.session.add(order)
+#         db.session.commit()
 
-        total_amount = 0
-        for item in cart.items:
-            total_amount += item.price * item.quantity
-            order_item = OrderItem(order_id=order.id, product_id=item.product_id, quantity=item.quantity, price=item.price)
-            db.session.add(order_item)
+#         total_amount = 0
+#         for item in cart.items:
+#             total_amount += item.price * item.quantity
+#             order_item = OrderItem(order_id=order.id, product_id=item.product_id, quantity=item.quantity, price=item.price)
+#             db.session.add(order_item)
 
-        db.session.commit()
+#         db.session.commit()
 
-        payment_data = {
-            'user_id': user.id,
-            'order_id': order.id,
-            'phone_number': data.get('phone_number'),
-            'amount': total_amount
-        }
+#         payment_data = {
+#             'user_id': user.id,
+#             'order_id': order.id,
+#             'phone_number': data.get('phone_number'),
+#             'amount': total_amount
+#         }
 
-        # Initiate payment through M-Pesa
-        mpesa_resource = MpesaPaymentResource()
-        payment_response = mpesa_resource.process_payment(payment_data)
+#         # Initiate payment through M-Pesa
+#         mpesa_resource = MpesaPaymentResource()
+#         payment_response = mpesa_resource.process_payment(payment_data)
 
-        if payment_response[1] != 201:
-            return {'error': 'Failed to initiate payment'}, 400
+#         if payment_response[1] != 201:
+#             return {'error': 'Failed to initiate payment'}, 400
 
-        # Clear the cart
-        CartItem.query.filter_by(cart_id=cart.id).delete()
-        db.session.commit()
+#         # Clear the cart
+#         CartItem.query.filter_by(cart_id=cart.id).delete()
+#         db.session.commit()
 
-        return {
-            'message': 'Order created and payment initiated successfully',
-            'order_id': order.id,
-            'payment_response': payment_response
-        }, 201
+#         return {
+#             'message': 'Order created and payment initiated successfully',
+#             'order_id': order.id,
+#             'payment_response': payment_response
+#         }, 201
 
 
-api.add_resource(MpesaPaymentResource, '/mpesa_payment')
+# api.add_resource(MpesaPaymentResource, '/mpesa_payment')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')

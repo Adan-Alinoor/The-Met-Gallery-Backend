@@ -27,7 +27,7 @@ def seed_products():
         {
             "title": "Starry Night",
             "description": "A masterpiece by Vincent van Gogh, depicting a dreamy interpretation of the artist's asylum room's sweeping view of Saint-Rémy-de-Provence at night.",
-            "price": 5000000,
+            "price": 2,
             "image": "https://i.ibb.co/484yd5n/Starry-night.jpg"
         },
         {
