@@ -131,10 +131,20 @@ import os
 from flask import Flask, request, jsonify
 import requests
 from flask_migrate import Migrate
-from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events
+
 from Resources.event import EventsResource
+from Resources.ticket import TicketResource
+from Resources.ticket import MpesaCallbackResource
+from Resources.ticket import CheckoutResource
+from Resources.booking import BookingResource
+from Resources.admin_ticket import TicketAdminResource
+from flask_cors import CORS
+
+from flask_restful import Resource, Api
+from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events, Booking, Ticket
+
 import logging
+
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"
@@ -217,10 +227,13 @@ class Home(Resource):
 
 # Add the EventsResource class as a resource to the API
 api.add_resource(Home, '/')
-api.add_resource(EventsResource, '/events', '/events/<int:id>')         
-        
 
-
+api.add_resource(EventsResource, '/events', '/events/<int:id>')
+api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
+api.add_resource(MpesaCallbackResource, '/callback')
+api.add_resource(CheckoutResource, '/checkout')
+api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
+api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
 
@@ -557,4 +570,5 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=5555)
+
 

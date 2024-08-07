@@ -36,6 +36,8 @@ class User(db.Model, SerializerMixin):
     orders = db.relationship('Order', back_populates='user')
 
     bookings = db.relationship('Booking', back_populates='user')
+    payments = db.relationship('Payment', back_populates='user')
+    
 
     serialize_only = ('id', 'username', 'email', 'role')
 
@@ -54,8 +56,9 @@ class Events(db.Model, SerializerMixin):
     location = db.Column(db.String, nullable=False)
 
     bookings = db.relationship('Booking', back_populates='event')
+    tickets = db.relationship('Ticket', back_populates='event') 
 
-    serialize_rules = ('-bookings',)
+    serialize_rules = ('-bookings', '-tickets')
 
     def to_dict(self):
         return {
@@ -72,7 +75,7 @@ class Events(db.Model, SerializerMixin):
         }
 
     def __repr__(self):
-        return f"Event('{self.title}', '{self.date}')"
+        return f"Event('{self.title}', '{self.start_date}')"
 
 class Booking(db.Model, SerializerMixin):
     __tablename__ = 'bookings'
@@ -80,17 +83,59 @@ class Booking(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
-    status = db.Column(db.String)
+    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
+    status = db.Column(db.String, default='pending')  # e.g., 'Confirmed', 'Cancelled'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='bookings')
     event = db.relationship('Events', back_populates='bookings')
+    ticket = db.relationship('Ticket', back_populates='bookings')
+    payments = db.relationship('Payment', back_populates='bookings') 
 
-    serialize_only = ('id', 'user_id', 'event_id', 'status', 'created_at')
-    serialize_rules = ('user', 'event')
+    serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
+    serialize_rules = ('user', 'event', 'ticket', 'payment')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id':self.user_id,
+            'event_id': self.event_id,
+            'ticket_id': self.ticket_id,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
+        }
 
     def __repr__(self):
-        return f"Booking('{self.user_id}', '{self.event_id}')"
+        return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
+    
+
+
+class Ticket(db.Model, SerializerMixin):
+    __tablename__ = 'tickets'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    type_name = db.Column(db.String, nullable=False)  # E.g., 'Regular', 'VIP', 'VVIP'
+    price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False) # Total quantity of ticket type
+    
+    event = db.relationship('Events', back_populates='tickets')
+    bookings = db.relationship('Booking', back_populates='ticket')
+
+    serialize_only = ('id', 'event_id', 'type_name', 'price', 'quantity')
+    serialize_rules = ('event', 'bookings')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'event_id': self.event_id,
+            'type_name': self.type_name,
+            'price': self.price,
+            'quantity': self.quantity
+        }
+
+    def __repr__(self):
+        return f"Ticket('{self.event_id}', '{self.type_name}', '{self.price}', '{self.quantity}')"
 
 class Product(db.Model, SerializerMixin):
     __tablename__ = 'products'
@@ -104,10 +149,8 @@ class Product(db.Model, SerializerMixin):
     def to_dict(self):
         return {
             'id': self.id,
-
             'title': self.title,
             'name': self.name,
-
             'description': self.description,
             'price': self.price,
             'image': self.image
@@ -176,10 +219,12 @@ class OrderItem(db.Model):
     order = db.relationship('Order', back_populates='items')
     product = db.relationship('Product')
 
+
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     phone_number = db.Column(db.String(15), nullable=False)
@@ -187,8 +232,10 @@ class Payment(db.Model):
     status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    user = db.relationship('User', back_populates='payments')
-    order = db.relationship('Order', back_populates='payments')
     result_desc = db.Column(db.String(255), nullable=True)
 
+    user = db.relationship('User', back_populates='payments')
+    bookings = db.relationship('Booking', back_populates='payments')
+    order = db.relationship('Order', back_populates='payments')
+    
 

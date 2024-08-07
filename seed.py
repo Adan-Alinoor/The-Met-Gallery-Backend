@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from app import app, db
-from models import Events, User, Artworks, Product
+from models import Events, User, Booking, Ticket, Payment, Artworks, Product
 from faker import Faker
 import logging
 
@@ -16,7 +16,11 @@ def delete_existing_data():
         logging.info("Deleting existing data...")
         Events.query.delete()
         User.query.delete()
+        Booking.query.delete()
+        Ticket.query.delete()
+        Payment.query.delete()
         Product.query.delete()
+
 
 def seed_users(num_users=10):
     with app.app_context():
