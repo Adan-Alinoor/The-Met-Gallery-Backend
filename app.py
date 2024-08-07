@@ -107,10 +107,18 @@ class UserResource(Resource):
         db.session.commit()
         return {'message': 'User deleted successfully'}, 200
 
+
+class AdminResource(Resource):
+    @jwt_required()
+    @admin_required
+    def get(self):
+        return {'message': 'Admin content accessible'}
+
 api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
 api.add_resource(Logout, '/logout')
 api.add_resource(UserResource, '/user')
+api.add_resource(AdminResource, '/admin')
 
 if __name__ == '__main__':
     app.run(debug=True)
