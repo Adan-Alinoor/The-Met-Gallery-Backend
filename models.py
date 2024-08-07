@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin, LoginManager
 from sqlalchemy import MetaData
 from datetime import datetime
 from sqlalchemy_serializer import SerializerMixin
@@ -16,6 +17,8 @@ convention = {
 metadata = MetaData(naming_convention=convention)
 
 db = SQLAlchemy(metadata=metadata)
+login_manager = LoginManager()
+
 
 class Artwork(db.Model, SerializerMixin):
     __tablename__ = 'artworks'
@@ -42,6 +45,7 @@ class User(db.Model, SerializerMixin):
     username = db.Column(db.String, nullable=False, unique=True)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
+    role = db.Column(db.String(50), nullable=False, default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     role = db.Column(db.String)
     

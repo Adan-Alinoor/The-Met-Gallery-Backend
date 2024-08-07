@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from app import app, db
-from models import Events, User, Booking, Ticket, Payment, Artwork, Product
+from models import Events, User, Booking, Ticket, Payment, Artwork
 from faker import Faker
 import logging
 
@@ -19,7 +19,7 @@ def delete_existing_data():
         Booking.query.delete()
         Ticket.query.delete()
         Payment.query.delete()
-        Product.query.delete()
+        Artwork.query.delete()
 
 
 def seed_users(num_users=10):
@@ -311,18 +311,18 @@ def seed_artworks():
     
     with app.app_context():
         logging.info("Seeding artworks...")
-        for product_data in artworks_data:
+        for artwork_data in artworks_data:
             try:
                 artwork = Artwork(
-                    title=product_data["title"],
-                    description=product_data["description"],
-                    price=product_data["price"],
-                    image=product_data["image"],
+                    title=artwork_data["title"],
+                    description=artwork_data["description"],
+                    price=artwork_data["price"],
+                    image=artwork_data["image"],
                     created_at=datetime.utcnow()
                 )
                 db.session.add(artwork)
             except Exception as e:
-                logging.error(f"Error adding product {artworks_data['title']}: {e}")
+                logging.error(f"Error adding Artwork {artworks_data['title']}: {e}")
 
         try:
             db.session.commit()
