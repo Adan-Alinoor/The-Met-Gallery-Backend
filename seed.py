@@ -1,3 +1,8 @@
+
+from models import db, Artwork
+from app import app
+
+def seed_data():
 from models import db, User, Product
 from app import app
 from faker import Faker
@@ -27,13 +32,21 @@ def seed_products():
         {
             "title": "Starry Night",
             "description": "A masterpiece by Vincent van Gogh, depicting a dreamy interpretation of the artist's asylum room's sweeping view of Saint-Rémy-de-Provence at night.",
+
+            "price": 5000000, 
+
             "price": 2,
+
             "image": "https://i.ibb.co/484yd5n/Starry-night.jpg"
         },
         {
             "title": "Mona Lisa",
             "description": "A portrait of Lisa Gherardini, wife of Francesco del Giocondo, known as the Mona Lisa, painted by Leonardo da Vinci.",
+
+            "price": 850000000,
+
             "price": 2,
+
             "image": "https://i.ibb.co/yQDhv3z/monalisa.jpg"
         },
         {
@@ -48,6 +61,46 @@ def seed_products():
             "price": 6000000,
             "image": "https://i.ibb.co/kHxK6FV/The-Persistence-of-Memory.jpg"
         },
+
+        
+        {
+        "title": "Girl with a Pearl Earring",
+        "description": "An oil painting by Dutch Golden Age painter Johannes Vermeer, depicting a girl wearing a pearl earring.",
+        "price": 7000000,
+        "image": "https://i.ibb.co/dPz3dHT/girlpearlearing.jpg"
+    },
+    {
+        "title": "The Night Watch",
+        "description": "A painting by Rembrandt, portraying a group of city guards.",
+        "price": 45000000,
+        "image": "https://i.ibb.co/GJCgyrG/The-Night-Watch.jpg"
+    },
+    {
+        "title": "Guernica",
+        "description": "A powerful anti-war painting by Pablo Picasso, reflecting the bombing of Guernica during the Spanish Civil War.",
+        "price": 200000000,
+        "image": "https://i.ibb.co/gVB8SQK/Picasso-Guernica.jpg"
+    },
+    {
+        "title": "The Birth of Venus",
+        "description": "A painting by Sandro Botticelli, depicting the goddess Venus emerging from the sea.",
+        "price": 100000000,
+        "image": "https://i.ibb.co/wwHdp6F/the-venus.jpg"
+    },
+    {
+        "title": "The Kiss",
+        "description": "A painting by Gustav Klimt, representing an intimate embrace.",
+        "price": 150000000,
+        "image": "https://i.ibb.co/PFVyPRw/The-Kiss.jpg"
+    },
+    {
+        "title": "American Gothic",
+        "description": "A painting by Grant Wood, showing a farmer and his daughter standing in front of a house.",
+        "price": 30000000,
+        "image": "https://i.ibb.co/5xMc8zq/American-Gothic.jpg"
+    },
+    {
+
         {
             "title": "Girl with a Pearl Earring",
             "description": "An oil painting by Dutch Golden Age painter Johannes Vermeer, depicting a girl wearing a pearl earring.",
@@ -85,6 +138,7 @@ def seed_products():
             "image": "https://i.ibb.co/5xMc8zq/American-Gothic.jpg"
         },
         {
+
             "title": "The Arnolfini Portrait",
             "description": "A painting by Jan van Eyck, depicting Giovanni di Nicolao di Arnolfini and his wife.",
             "price": 90000000,
@@ -96,6 +150,8 @@ def seed_products():
             "price": 8000000,
             "image": "https://i.ibb.co/zGc8Pmj/waterlilies.jpg"
         },
+
+
         {
             "title": "The Last Supper",
             "description": "A late 15th-century mural painting by Leonardo da Vinci, housed by the Convent of Santa Maria delle Grazie in Milan.",
@@ -160,7 +216,11 @@ def seed_products():
             "title": "The Night Café",
             "description": "An oil painting created by Dutch artist Vincent van Gogh in 1888, depicting a night café in Arles.",
             "price": 40000000,
+
+            "image": "https://i.ibb.co/qg7YZBF/Vincent-Willem-van-Gogh-076.jpg"
+
             "image": "https://i.ibb.co/qg7YZBF/Vincent-Willem-van- Gogh-076.jpg"
+
         },
         {
             "title": "Impression, Sunrise",
@@ -182,6 +242,52 @@ def seed_products():
         },
         {
             "title": "Bal du moulin de la Galette",
+
+            "description": "A painting by the French artist Pierre-Auguste Renoir, showing a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
+            "price": 120000000,
+            "image": "https://i.ibb.co/1JSBYtJ/Auguste-Renoir.jpg"
+        },
+        {
+            "title": "The Son of Man",
+            "description": "A 1964 painting by the Belgian surrealist painter René Magritte.",
+            "price": 17000000,
+            "image": "https://i.ibb.co/1bnzX7n/Bamberg-Apocalypse.jpg"
+        },
+        {
+            "title": "The Great Wave off Kanagawa",
+            "description": "A woodblock print by the Japanese ukiyo-e artist Hokusai, depicting a giant wave threatening boats off the coast of Kanagawa.",
+            "price": 8000000,
+            "image": "https://i.ibb.co/19KPS1z/Tsunami-by-hokusai-19th-century.jpg"
+        },
+        {
+            "title": "Venus de Milo",
+            "description": "An ancient Greek statue and one of the most famous works of ancient Greek sculpture.",
+            "price": 100000000,
+            "image": "https://i.ibb.co/hg38jTH/V-nus-de-Milo-Mus-e-du-Louvre-AGER-LL-299-N-527-Ma-399.jpg"
+        }
+       
+        
+    ]
+
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+
+        for artwork in artworks:
+            new_artwork = Artwork(
+                title=artwork['title'],
+                description=artwork['description'],
+                price=artwork['price'],
+                image=artwork['image']
+            )
+            db.session.add(new_artwork)
+
+        db.session.commit()
+        print("Database seeded successfully!")
+
+if __name__ == "__main__":
+    seed_data()
+
             "description": "A painting by French artist Pierre-Auguste Renoir, portraying a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
             "price": 78000000,
             "image": "https://i.ibb.co/YT68J2v/1200px-Auguste-Renoir-Le-Moulin-de-la-Galette.jpg"
@@ -219,3 +325,4 @@ def seed_all():
 
 if __name__ == '__main__':
     seed_all()
+

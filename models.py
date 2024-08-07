@@ -1,5 +1,14 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy_serializer import SerializerMixin
+
+
+db = SQLAlchemy()
+
+class Artwork(db.Model, SerializerMixin):
+    __tablename__ = 'artworks'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+
 from datetime import datetime
 
 db = SQLAlchemy()
@@ -18,6 +27,7 @@ class Product(db.Model, SerializerMixin):
     __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
+
     description = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     image = db.Column(db.String, nullable=False)
@@ -25,11 +35,16 @@ class Product(db.Model, SerializerMixin):
     def to_dict(self):
         return {
             'id': self.id,
+
+            'title': self.title,
             'name': self.name,
+
             'description': self.description,
             'price': self.price,
             'image': self.image
         }
+
+
 
 class Cart(db.Model, SerializerMixin):
     __tablename__ = 'carts'
@@ -106,3 +121,4 @@ class Payment(db.Model):
     user = db.relationship('User', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
     result_desc = db.Column(db.String(255), nullable=True)
+
