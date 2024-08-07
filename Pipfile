@@ -16,8 +16,17 @@ sqlalchemy = "*"
 python-dotenv = "*"
 faker = "*"
 requests = "*"
+flask = "*"
+flask-sqlalchemy = "*"
+flask-login = "*"
+sqlalchemy = "*"
+flask-restful = "*"
+flask-migrate = "*"
+bcrypt = "*"
+marshmallow = "*"
+flask-jwt-extended = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.10"
+python_version = "3.8"
