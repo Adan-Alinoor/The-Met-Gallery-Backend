@@ -1,17 +1,26 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData
+from datetime import datetime
 from sqlalchemy_serializer import SerializerMixin
 
 
-db = SQLAlchemy()
+convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+metadata = MetaData(naming_convention=convention)
+
+db = SQLAlchemy(metadata=metadata)
 
 class Artwork(db.Model, SerializerMixin):
     __tablename__ = 'artworks'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String, nullable=False)
 
-from datetime import datetime
-
-db = SQLAlchemy()
 
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
@@ -19,9 +28,69 @@ class User(db.Model, SerializerMixin):
     username = db.Column(db.String, nullable=False, unique=True)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    role = db.Column(db.String)
+    
     cart = db.relationship('Cart', back_populates='user', uselist=False)
     payments = db.relationship('Payment', back_populates='user')
     orders = db.relationship('Order', back_populates='user')
+
+    bookings = db.relationship('Booking', back_populates='user')
+
+    serialize_only = ('id', 'username', 'email', 'role')
+
+class Events(db.Model, SerializerMixin):
+    __tablename__ = 'events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    image_url = db.Column(db.String)
+    description = db.Column(db.String, nullable=False)
+    start_date = db.Column(db.Date, nullable=False)  
+    end_date = db.Column(db.Date, nullable=False) 
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    time = db.Column(db.Time, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    location = db.Column(db.String, nullable=False)
+
+    bookings = db.relationship('Booking', back_populates='event')
+
+    serialize_rules = ('-bookings',)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'image_url': self.image_url,
+            'description': self.description,
+            'start_date': self.start_date.isoformat(), 
+            'end_date': self.end_date.isoformat(), 
+            'user_id': self.user_id,
+            'time': self.time.isoformat(),
+            'created_at': self.created_at.isoformat(),
+            'location': self.location
+        }
+
+    def __repr__(self):
+        return f"Event('{self.title}', '{self.date}')"
+
+class Booking(db.Model, SerializerMixin):
+    __tablename__ = 'bookings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    status = db.Column(db.String)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', back_populates='bookings')
+    event = db.relationship('Events', back_populates='bookings')
+
+    serialize_only = ('id', 'user_id', 'event_id', 'status', 'created_at')
+    serialize_rules = ('user', 'event')
+
+    def __repr__(self):
+        return f"Booking('{self.user_id}', '{self.event_id}')"
 
 class Product(db.Model, SerializerMixin):
     __tablename__ = 'products'
@@ -121,4 +190,5 @@ class Payment(db.Model):
     user = db.relationship('User', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
     result_desc = db.Column(db.String(255), nullable=True)
+
 

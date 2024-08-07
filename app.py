@@ -1,12 +1,3 @@
-
-from flask import Flask, request, jsonify
-from flask_migrate import Migrate
-from flask_restful import Api, Resource
-from models import db, User, Artwork
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] 
 import base64
 from datetime import datetime
 import os
@@ -14,7 +5,8 @@ from flask import Flask, request, jsonify
 import requests
 from flask_migrate import Migrate
 from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem
+from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events
+from Resources.event import EventsResource
 import logging
 
 app = Flask(__name__)
@@ -89,6 +81,17 @@ class ArtworkResource(Resource):
             return {"message": "Artwork deleted"}, 200
         except Exception as e:
             return {"error": str(e)}, 500
+          
+          
+class Home(Resource):
+    def get(self):
+        response_dict = {"message": "Welcome to The Met Gallery"}
+        return jsonify(response_dict)
+
+# Add the EventsResource class as a resource to the API
+api.add_resource(Home, '/')
+api.add_resource(EventsResource, '/events', '/events/<int:id>')         
+        
 
 
 api.add_resource(ArtworkListResource, '/artworks')
@@ -589,3 +592,4 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=5555)
+
