@@ -33,7 +33,7 @@ class Artwork(db.Model, SerializerMixin):
             'description': self.description,
             'price': self.price,
             'image': self.image,
-            'created_at': self.created_at
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 class User(db.Model, SerializerMixin):
@@ -81,7 +81,7 @@ class Events(db.Model, SerializerMixin):
             'end_date': self.end_date.isoformat(), 
             'user_id': self.user_id,
             'time': self.time.isoformat(),
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'location': self.location
         }
 
@@ -129,7 +129,7 @@ class CartItem(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
-    name = db.Column(db.String, nullable=False)
+    title = db.Column(db.String, nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     description = db.Column(db.String, nullable=False)
@@ -145,7 +145,7 @@ class CartItem(db.Model, SerializerMixin):
             'product_id': self.artwork_id,
             'quantity': self.quantity,
             'price': self.price,
-            'name': self.name,
+            'title': self.title,
             'description': self.description,
             'image': self.image,
             'product': self.artwork.to_dict()

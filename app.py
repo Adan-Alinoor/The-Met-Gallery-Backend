@@ -134,6 +134,12 @@ def generate_password(shortcode, passkey):
 
 
 
+from flask import Flask, request, jsonify
+import requests
+from sqlalchemy.exc import SQLAlchemyError
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork
+from flask_restful import Resource
+
 class CheckoutResource(Resource):
     def initiate_mpesa_payment(self, payment_data):
         user_id = payment_data.get('user_id')
@@ -170,7 +176,7 @@ class CheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://f318-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -220,47 +226,53 @@ class CheckoutResource(Resource):
 
         order = Order(user_id=user.id)
         db.session.add(order)
-        db.session.commit()
 
         total_amount = 0
-        for selected_item in selected_items:
-            artwork_id = selected_item.get('artwork_id')
-            quantity = selected_item.get('quantity', 1)
+        try:
+            for selected_item in selected_items:
+                artwork_id = selected_item.get('artwork_id')
+                quantity = selected_item.get('quantity', 1)
 
-            cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-            if not cart_item or cart_item.quantity < quantity:
-                return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
+                cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+                if not cart_item or cart_item.quantity < quantity:
+                    db.session.rollback()  # Rollback changes if quantity is invalid
+                    return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
 
-            total_amount += cart_item.price * quantity
-            order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
-            db.session.add(order_item)
+                total_amount += cart_item.price * quantity
+                order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
+                db.session.add(order_item)
 
-            # Decrement the quantity or remove the CartItem
-            if cart_item.quantity > quantity:
-                cart_item.quantity -= quantity
-            else:
-                db.session.delete(cart_item)
+                # Decrement the quantity or remove the CartItem
+                if cart_item.quantity > quantity:
+                    cart_item.quantity -= quantity
+                else:
+                    db.session.delete(cart_item)
 
-        db.session.commit()
+            db.session.commit()
 
-        payment_data = {
-            'user_id': user.id,
-            'order_id': order.id,
-            'phone_number': data.get('phone_number'),
-            'amount': total_amount
-        }
+            payment_data = {
+                'user_id': user.id,
+                'order_id': order.id,
+                'phone_number': data.get('phone_number'),
+                'amount': total_amount
+            }
 
-        # Initiate payment through M-Pesa
-        payment_response = self.initiate_mpesa_payment(payment_data)
+            # Initiate payment through M-Pesa
+            payment_response = self.initiate_mpesa_payment(payment_data)
 
-        if payment_response[1] != 201:
-            return {'error': 'Failed to initiate payment'}, 400
+            if payment_response[1] != 201:
+                db.session.rollback()  # Rollback cart item removal if payment fails
+                return {'error': 'Failed to initiate payment'}, 400
 
-        return {
-            'message': 'Order created and payment initiated successfully',
-            'order_id': order.id,
-            'payment_response': payment_response
-        }, 201
+            return {
+                'message': 'Order created and payment initiated successfully',
+                'order_id': order.id,
+                'payment_response': payment_response
+            }, 201
+        except SQLAlchemyError as e:
+            db.session.rollback()  # Rollback changes if there's a database error
+            logging.error(f'Database error: {e}')
+            return {'error': 'An error occurred while processing the order'}, 500
 
 
 
@@ -352,7 +364,7 @@ class AddToCartResource(Resource):
                 cart_id=cart.id,
                 artwork_id=artwork.id,
                 quantity=quantity, # Adjust quantity as needed
-                name = artwork.name,
+                title = artwork.title,
                 description=artwork.description,
                 price=artwork.price,
                 image=artwork.image
