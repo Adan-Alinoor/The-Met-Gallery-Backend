@@ -1,5 +1,3 @@
-
-
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource, reqparse
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -7,26 +5,30 @@ from flask_migrate import Migrate
 from model import db, User  
 import bcrypt
 from auth import admin_required
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
-app.config['SECRET_KEY'] = 'your_secret_key_here'  
+app.config['SECRET_KEY'] = 'your_secret_key_here'
+app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 
-db.init_app(app)
-api = Api(app)
+db.init_app(app) 
 migrate = Migrate(app, db)
+jwt = JWTManager(app)
+api = Api(app)
 
 class Signup(Resource):
     def post(self):
         args = request.get_json()
-        if not all(k in args for k in ('username', 'email', 'password', 'role')):
-            return {'message': 'Username, email, password, and role are required'}, 400
+        if not all(k in args for k in ('username', 'email', 'password')):
+            return {'message': 'Username, email, and password are required'}, 400
         
+        role = args.get('role', 'user')  
         hashed_password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        new_user = User(username=args['username'], email=args['email'], password=hashed_password, role=args['role'])
+        new_user = User(username=args['username'], email=args['email'], password=hashed_password, role=role)
         db.session.add(new_user)
         db.session.commit()
 
-        return {'message': f"{args['role'].capitalize()} created successfully"}, 201
+        return {'message': f"{role.capitalize()} created successfully"}, 201
     
 
 class Login(Resource):
@@ -107,7 +109,6 @@ class UserResource(Resource):
         db.session.commit()
         return {'message': 'User deleted successfully'}, 200
 
-
 class AdminResource(Resource):
     @jwt_required()
     @admin_required
@@ -122,3 +123,4 @@ api.add_resource(AdminResource, '/admin')
 
 if __name__ == '__main__':
     app.run(debug=True)
+
