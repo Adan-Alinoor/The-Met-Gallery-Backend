@@ -317,3 +317,15 @@ class Message(db.Model):
     recipient = db.Column(db.String(80), nullable=False)
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now(datetime.UTC))
+    
+class UserActivity(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    activity_type = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+ 
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
