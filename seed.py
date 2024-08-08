@@ -1,7 +1,8 @@
+
 import os
 from datetime import datetime
 from app import app, db
-from models import Events, User, Booking, Ticket, Payment, Artwork
+from models import Events, User, Booking, Ticket, Payment, Artwork,OrderItem,Order,Cart,CartItem,ShippingAddress
 from faker import Faker
 import logging
 
@@ -13,26 +14,64 @@ logging.basicConfig(level=logging.INFO)
 
 def delete_existing_data():
     with app.app_context():
-        logging.info("Deleting existing data...")
-        Events.query.delete()
-        User.query.delete()
-        Booking.query.delete()
-        Ticket.query.delete()
-        Payment.query.delete()
-        Artwork.query.delete()
+        logging.info("Starting data deletion process...")
+        try:
+            # Delete data from dependent tables first
+            logging.info("Deleting data from OrderItems...")
+            OrderItem.query.delete()
 
+            logging.info("Deleting data from Orders...")
+            Order.query.delete()
+
+            logging.info("Deleting data from Payments...")
+            Payment.query.delete()
+
+            logging.info("Deleting data from Bookings...")
+            Booking.query.delete()
+
+            logging.info("Deleting data from Tickets...")
+            Ticket.query.delete()
+
+            logging.info("Deleting data from Events...")
+            Events.query.delete()
+
+            logging.info("Deleting data from CartItems...")
+            CartItem.query.delete()
+
+            logging.info("Deleting data from Carts...")
+            Cart.query.delete()
+
+            logging.info("Deleting data from Artworks...")
+            Artwork.query.delete()
+
+            logging.info("Deleting data from Users...")
+            User.query.delete()
+
+            logging.info("Deleting data from ShippingAddresses...")
+            ShippingAddress.query.delete()
+
+            db.session.commit()
+            logging.info("Data deleted successfully.")
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error deleting data: {e}")
 
 def seed_users(num_users=10):
     with app.app_context():
         logging.info("Seeding users...")
-        users = [User(username=fake.user_name(), email=fake.email(), password=fake.password(), role='user') for _ in range(num_users)]
-        db.session.bulk_save_objects(users)
-        db.session.commit()
-        logging.info("Users seeded.")
+        try:
+            users = [User(username=fake.user_name(), email=fake.email(), password=fake.password(), role='user') for _ in range(num_users)]
+            db.session.bulk_save_objects(users)
+            db.session.commit()
+            logging.info("Users seeded.")
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error seeding users: {e}")
 
 def seed_events():
     events_data = [
-        {
+        # Your event data here...
+         {
             "title": "The Grief Paintings",
             "image_url": "https://images.artnet.com/gallery-images/425937671/95826851-8e2f-4dbe-a10d-e9c97c1b7997.jpg?x=1320%40%211320aD0xMzIwJnc9MTMyMCZmPWNvbnRhaW4mdD1s",
             "description": "An exhibition of new paintings by Helen Marden, created with resin, powdered pigment, ink, and natural objects, reflecting on life, love, and creativity.",
@@ -96,8 +135,8 @@ def seed_events():
     
     with app.app_context():
         logging.info("Seeding events...")
-        for event_data in events_data:
-            try:
+        try:
+            for event_data in events_data:
                 start_date = datetime.strptime(event_data["start_date"], "%d-%m-%Y").date()
                 end_date = datetime.strptime(event_data["end_date"], "%d-%m-%Y").date()
                 event_time = datetime.strptime(event_data["time"], "%H:%M:%S").time()
@@ -114,19 +153,15 @@ def seed_events():
                     created_at=datetime.utcnow()
                 )
                 db.session.add(event)
-            except Exception as e:
-                logging.error(f"Error adding event {event_data['title']}: {e}")
-
-        try:
             db.session.commit()
             logging.info("Events seeded.")
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error committing to database: {e}")
+            logging.error(f"Error seeding events: {e}")
 
 def seed_artworks():
     artworks_data = [
-         {
+        {
         "title": "Starry Night",
         "description": "A masterpiece by Vincent van Gogh, depicting a dreamy view from the artist's asylum room.",
         "price": 1,
@@ -311,8 +346,8 @@ def seed_artworks():
     
     with app.app_context():
         logging.info("Seeding artworks...")
-        for artwork_data in artworks_data:
-            try:
+        try:
+            for artwork_data in artworks_data:
                 artwork = Artwork(
                     title=artwork_data["title"],
                     description=artwork_data["description"],
@@ -321,15 +356,11 @@ def seed_artworks():
                     created_at=datetime.utcnow()
                 )
                 db.session.add(artwork)
-            except Exception as e:
-                logging.error(f"Error adding Artwork {artworks_data['title']}: {e}")
-
-        try:
             db.session.commit()
             logging.info("Artworks seeded.")
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error committing to database: {e}")
+            logging.error(f"Error seeding artworks: {e}")
 
 def main():
     logging.info("Starting data seeding...")

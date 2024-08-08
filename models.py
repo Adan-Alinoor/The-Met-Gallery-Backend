@@ -55,7 +55,7 @@ class User(db.Model, SerializerMixin):
 
     bookings = db.relationship('Booking', back_populates='user')
     payments = db.relationship('Payment', back_populates='user')
-    
+    shipping_addresses = db.relationship('ShippingAddress', back_populates='user', cascade='all, delete-orphan')
 
     serialize_only = ('id', 'username', 'email', 'role')
 
@@ -204,6 +204,8 @@ class Order(db.Model):
     user = db.relationship('User', back_populates='orders')
     items = db.relationship('OrderItem', back_populates='order', cascade='all, delete-orphan')
     payments = db.relationship("Payment", back_populates="order")
+    shipping_address_id = db.Column(db.Integer, db.ForeignKey('shipping_addresses.id'))
+    shipping_address = db.relationship('ShippingAddress', back_populates='orders')
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
@@ -214,25 +216,62 @@ class OrderItem(db.Model):
     price = db.Column(db.Integer, nullable=False)
     
     order = db.relationship('Order', back_populates='items')
-    arwork = db.relationship('Artwork')
+    artwork = db.relationship('Artwork')
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'order_id': self.order_id,
+            'artwork_id': self.artwork_id,
+            'quantity': self.quantity,
+            'price': self.price,
+            'artwork': self.artwork.to_dict()
+        }
 
-class Payment(db.Model):
+class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    amount = db.Column(db.Integer, nullable=False)
-    phone_number = db.Column(db.String(15), nullable=False)
-    transaction_id = db.Column(db.String(50), nullable=True)
-    status = db.Column(db.String(20), default='pending')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    result_desc = db.Column(db.String(255), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    payment_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    phone_number = db.Column(db.String(20), nullable=False) 
+    transaction_code = db.Column(db.String ,nullable=True)
+    status = db.Column(db.String(50), default='pending')
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    transaction_desc = db.Column(db.String(255), nullable=True)
+    result_desc = db.Column(db.String(255), nullable=True)  
 
     user = db.relationship('User', back_populates='payments')
     bookings = db.relationship('Booking', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
-    
+
+
+class ShippingAddress(db.Model, SerializerMixin):
+    __tablename__ = 'shipping_addresses'
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, nullable=False)
+    address = db.Column(db.String, nullable=False)
+    city = db.Column(db.String, nullable=False)
+    country = db.Column(db.String, nullable=False)
+    phone = db.Column(db.String, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user = db.relationship('User', back_populates='shipping_addresses')
+    orders = db.relationship('Order', back_populates='shipping_address')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'full_name': self.full_name,
+            'email': self.email,
+            'address': self.address,
+            'city': self.city,
+            'country': self.country,
+            'phone': self.phone
+        }
+
+
 
