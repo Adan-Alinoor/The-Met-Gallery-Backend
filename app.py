@@ -18,7 +18,7 @@ from auth import user_required, admin_required
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 CALLBACK_SECRET = 'your_secret_key_here'
@@ -345,7 +345,6 @@ class CheckoutResource(Resource):
 
         order = Order(user_id=user.id)
         db.session.add(order)
-        db.session.commit()
 
         total_amount = 0
         for selected_item in selected_items:
@@ -365,7 +364,7 @@ class CheckoutResource(Resource):
             else:
                 db.session.delete(cart_item)
 
-        db.session.commit()
+            db.session.commit()
 
         payment_data = {
             'user_id': user.id,
@@ -377,7 +376,8 @@ class CheckoutResource(Resource):
         payment_response = self.initiate_mpesa_payment(payment_data)
 
         if payment_response[1] != 201:
-            return {'error': 'Failed to initiate payment'}, 400
+                db.session.rollback()  # Rollback cart item removal if payment fails
+                return {'error': 'Failed to initiate payment'}, 400
 
         return {
             'message': 'Order created and payment initiated successfully',
@@ -434,7 +434,7 @@ def mpesa_callback():
     else:
         logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
-
+    
 
 
 class AddToCartResource(Resource):
@@ -502,6 +502,7 @@ class RemoveFromCartResource(Resource):
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
             return {'error': 'Artwork not found in cart'}, 404
+            return {'error': 'Artwork not found in cart'}, 404
 
         if cart_item.quantity > 1:
             cart_item.quantity -= 1
@@ -532,7 +533,6 @@ class ViewCartResource(Resource):
 from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.ticket import TicketResource
-
 from Resources.ticket import MpesaCallbackResource
 from Resources.ticket import CheckoutResource
 from Resources.booking import BookingResource

@@ -1,8 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, LoginManager
+from flask_login import UserMixin, LoginManager
 from sqlalchemy import MetaData
 from datetime import datetime
 from sqlalchemy_serializer import SerializerMixin
+from datetime import datetime
 
 
 convention = {
@@ -16,6 +18,8 @@ convention = {
 metadata = MetaData(naming_convention=convention)
 
 db = SQLAlchemy(metadata=metadata)
+login_manager = LoginManager()
+
 login_manager = LoginManager()
 
 class Artwork(db.Model, SerializerMixin):
@@ -37,6 +41,7 @@ class Artwork(db.Model, SerializerMixin):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+
     serialize_only = ('id', 'title', 'description', 'price', 'image')
 
 
@@ -47,6 +52,7 @@ class User(db.Model, SerializerMixin, UserMixin):
     username = db.Column(db.String, nullable=False, unique=True)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
+    role = db.Column(db.String(50), nullable=False, default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     role = db.Column(db.String(50), nullable=False, default='user')
     is_admin = db.Column(db.Boolean, default=False)  
@@ -89,7 +95,7 @@ class Events(db.Model, SerializerMixin):
             'end_date': self.end_date.isoformat(), 
             'user_id': self.user_id,
             'time': self.time.isoformat(),
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'location': self.location
         }
 
@@ -178,11 +184,14 @@ class CartItem(db.Model, SerializerMixin):
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     title = db.Column(db.String, nullable=False)
+    artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
+    title = db.Column(db.String, nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     description = db.Column(db.String, nullable=False)
     image = db.Column(db.String(200), nullable=False)
 
+    artwork = db.relationship('Artwork')
     artwork = db.relationship('Artwork')
     cart = db.relationship('Cart', back_populates='items')
     
@@ -190,13 +199,16 @@ class CartItem(db.Model, SerializerMixin):
         return {
             'id': self.id,
             'cart_id': self.cart_id,
+            'artwork_id': self.artwork_id,
             'artwork_id': self.artwork_id,  # Changed from 'product_id' to 'artwork_id'
             'quantity': self.quantity,
             'price': self.price,
             'title': self.title,
+            'title': self.title,
             'description': self.description,
             'image': self.image,
-            'artwork': self.artwork.to_dict()  # Updated to 'artwork'
+            'artwork': self.artwork.to_dict()
+            
         }
 
 
@@ -214,10 +226,12 @@ class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
+    artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     
     order = db.relationship('Order', back_populates='items')
+    arwork = db.relationship('Artwork')
     artwork = db.relationship('Artwork')  # Changed from 'Product' to 'Artwork'
 
     def to_dict(self):
@@ -236,9 +250,9 @@ class OrderItem(db.Model):
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
     amount = db.Column(db.Integer, nullable=False)
     phone_number = db.Column(db.String(15), nullable=False)
     transaction_id = db.Column(db.String(50), nullable=True)
@@ -246,6 +260,7 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     result_desc = db.Column(db.String(255), nullable=True)
+    payment_type = db.Column(db.String(20), nullable=False)
 
     user = db.relationship('User', back_populates='payments')
     bookings = db.relationship('Booking', back_populates='payments')

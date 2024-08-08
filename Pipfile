@@ -17,6 +17,7 @@ python-dotenv = "*"
 faker = "*"
 requests = "*"
 flask-login = "*"
+bcrypt = "*"
 marshmallow = "*"
 
 [dev-packages]

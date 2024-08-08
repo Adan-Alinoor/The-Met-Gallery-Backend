@@ -2,18 +2,18 @@ import base64
 import json
 import logging
 import os
+import threading
+import time
 from datetime import datetime
 from flask_jwt_extended import jwt_required
 import requests
 from dotenv import load_dotenv
-from flask import Flask, jsonify, make_response, request
+from flask import request, current_app
 from flask_restful import Resource, reqparse
+from sqlalchemy.exc import SQLAlchemyError
 
 
-from models import db, Ticket, Booking,User, Payment
-
-# Initialize Flask application
-app = Flask(__name__)
+from models import db, Ticket, Booking, User, Payment
 
 # Load environment variables from .env file
 load_dotenv()
@@ -44,7 +44,6 @@ def get_mpesa_access_token():
     logging.debug(f"Status Code: {response.status_code}")
     logging.debug(f"Response Text: {response.text}")
     
-    
     if response.status_code == 200:
         json_response = response.json()
         return json_response['access_token']
@@ -60,6 +59,62 @@ def generate_password(shortcode, passkey):
     encoded_string = base64.b64encode(data_to_encode.encode())
     return encoded_string.decode('utf-8'), timestamp
 
+def determine_payment_type(payment_data):
+    """
+    Determines the payment type based on the provided data.
+    """
+    if payment_data.get('order_id'):
+        return 'artwork'
+    elif payment_data.get('booking_id'):
+        return 'event'
+    else:
+        raise ValueError("Cannot determine payment type from provided data")
+
+def create_payment(payment_data):
+    """
+    Creates a new payment record in the database.
+    """
+    payment_type = determine_payment_type(payment_data)
+    
+    payment = Payment(
+        user_id=payment_data.get('user_id'),
+        booking_id=payment_data.get('booking_id'),
+        order_id=payment_data.get('order_id') if payment_type == 'artwork' else None,
+        amount=payment_data['amount'],
+        phone_number=payment_data.get('phone_number'),
+        transaction_id=payment_data.get('transaction_id'),
+        status=payment_data.get('status'),
+        result_desc=payment_data.get('result_desc'),
+        payment_type=payment_type
+    )
+    db.session.add(payment)
+    db.session.commit()
+
+class TicketResource(Resource):
+    def initiate_payment(self, app, payment_data, payment):
+        """
+        Initiates payment process with M-Pesa.
+        """
+        with app.app_context():
+            access_token = get_mpesa_access_token()
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+            payload = {
+                "BusinessShortCode": SHORTCODE,
+                "Password": password,
+                "Timestamp": timestamp,
+                "TransactionType": "CustomerPayBillOnline",
+                "Amount": payment_data['amount'],
+                "PartyA": payment_data['phone_number'],
+                "PartyB": SHORTCODE,
+                "PhoneNumber": payment_data['phone_number'],
+                "CallBackURL": "https://f318-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+                "AccountReference": f"Booking ('booking.id')",
+                "TransactionDesc": "Payment for event ticket purchase. Thank you for your order!"
+            }
 class CheckoutResource(Resource):
     def initiate_mpesa_payment(self, payment_data):
         user_id = payment_data.get('user_id')
@@ -101,42 +156,74 @@ class CheckoutResource(Resource):
             "TransactionDesc": "Payment for booking"
         }
 
-        try:
-            response = requests.post(
-                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                headers=headers,
-                json=payload
-            )
-            logging.debug(f'M-Pesa API Response: {response.text}')
-            response_data = response.json()
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error calling M-Pesa API: {e}')
-            return {'error': 'Failed to connect to M-Pesa API'}, 500
-        except ValueError:
-            logging.error(f'Invalid JSON response: {response.text}')
-            return {'error': 'Invalid response from M-Pesa API'}, 500
+            try:
+                response = requests.post(
+                    "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+                    headers=headers,
+                    json=payload
+                )
 
-        if response_data.get('ResponseCode') == '0':
-            payment.transaction_id = response_data['CheckoutRequestID']
-            payment.status = 'initiated'
-            db.session.commit()
-            return {'message': 'Payment initiated successfully'}, 201
-        else:
-            return {'error': 'Failed to initiate payment'}, 400
+                logging.debug(f'M-Pesa API Response: {response.text}')
+                response_data = response.json()
+            except requests.exceptions.RequestException as e:
+                logging.error(f'Error calling M-Pesa API: {e}')
+                payment.status = 'failed'
+                payment.result_desc = 'Failed to connect to M-Pesa API'
+                db.session.commit()
+                return {'error': 'Failed to connect to M-Pesa API'}, 500
+            except ValueError:
+                logging.error(f'Invalid JSON response: {response.text}')
+                payment.status = 'failed'
+                payment.result_desc = 'Invalid response from M-Pesa API'
+                db.session.commit()
+                return {'error': 'Invalid response from M-Pesa API'}, 500
+
+            if response_data.get('ResponseCode') == '0':
+                payment.transaction_id = response_data['CheckoutRequestID']
+                payment.status = 'initiated'
+                db.session.commit()
+
+                # Wait for payment status to be updated
+                while True:
+                    payment = Payment.query.filter_by(transaction_id=payment.transaction_id).first()
+                    if payment is None:
+                        logging.error(f'Payment record not found for transaction_id: {payment.transaction_id}')
+                        break
+                    if payment.status == 'completed':
+                        return {'message': 'Payment completed successfully'}, 201
+                    if payment.status == 'failed':
+                        break
+                    time.sleep(1)
+
+                return {'error': 'Payment failed'}, 400
+            else:
+                payment.status = 'failed'
+                payment.result_desc = response_data.get('ResponseDescription', 'Failed to initiate payment')
+                db.session.commit()
+                return {'error': 'Failed to initiate payment'}, 400
 
     def post(self):
-        data = request.get_json()
-        user_id = data.get('user_id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+        """
+        Handles ticket purchase and payment initiation via M-Pesa.
+        """
+        args = ticket_parser.parse_args()
+        user_id = args['user_id']
+        ticket_type = args['ticket_type']
+        quantity = args['quantity']
+        phone_number = args['phone_number']
 
+        # Validate input fields
+        if not all([user_id, ticket_type, quantity, phone_number]):
+            return {'error': 'All fields are required'}, 400
+
+        # Get user from database
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
 
-        ticket_type = data.get('ticket_type')
-        quantity = data.get('quantity')
-        phone_number = data.get('phone_number')
+        # Validate phone number format
+        if not phone_number.startswith("2547") or len(phone_number) != 12:
+            return {"error": "Invalid phone number"}, 400
 
         # Find the ticket type in the database
         ticket = Ticket.query.filter_by(type_name=ticket_type).first()
@@ -148,31 +235,52 @@ class CheckoutResource(Resource):
             return {'error': 'Not enough tickets available'}, 400
 
         # Calculate the total amount to be paid
-        total_amount = ticket.price * quantity
+        amount = ticket.price * quantity
 
-        # Create a new Booking record
-        booking = Booking(user_id=user.id, event_id=ticket.event_id, ticket_id=ticket.id, status='pending')
-        db.session.add(booking)
+        # Decrease the ticket quantity
+        ticket.quantity -= quantity
         db.session.commit()
 
-        payment_data = {
-            'user_id': user.id,
-            'booking_id': booking.id,
-            'phone_number': phone_number,
-            'amount': total_amount
-        }
+        try:
+            # Create a new Booking record
+            booking = Booking(user_id=user_id, event_id=ticket.event_id, ticket_id=ticket.id, status='pending')
+            db.session.add(booking)
+            db.session.commit()
 
-        # Initiate payment through M-Pesa
-        payment_response = self.initiate_mpesa_payment(payment_data)
-        if payment_response[1] != 201:
-            return {'error': 'Failed to initiate payment'}, 400
+            payment_data = {
+                'user_id': user_id,
+                'booking_id': booking.id,
+                'phone_number': phone_number,
+                'amount': amount
+            }
 
-        return {
-            'message': 'Booking created and payment initiated successfully',
-            'booking_id': booking.id,
-            'payment_response': payment_response
-        }, 201
+            # Create a new Payment record
+            payment = Payment(
+                user_id=user_id,
+                booking_id=booking.id,
+                amount=amount,
+                phone_number=phone_number,
+                status='initiated',
+                payment_type='event'  
+            )
+            db.session.add(payment)
+            db.session.commit()
 
+            # Create a new thread to initiate the payment process
+            app = current_app._get_current_object()
+            thread = threading.Thread(target=self.initiate_payment, args=(app, payment_data, payment))
+            thread.start()
+
+            return {
+                'message': 'Ticket payment initiated successfully',
+                'booking_id': booking.id
+            }, 201
+        except SQLAlchemyError as e:
+            db.session.rollback()  # Rollback changes if there's a database error
+            logging.error(f'Database error: {e}')
+            return {'error': 'An error occurred while processing the order'}, 500
+        
+        
 class MpesaCallbackResource(Resource):
     
     def post(self):
@@ -203,10 +311,9 @@ class MpesaCallbackResource(Resource):
         if payment:
             if result_code == 0:
                 payment.status = 'completed'
-                payment.result_desc = result_desc
             else:
                 payment.status = 'failed'
-                payment.result_desc = result_desc
+            payment.result_desc = result_desc
             db.session.commit()
             logging.debug(f'Payment status updated to: {payment.status}')
             return {"ResultCode": 0, "ResultDesc": "Accepted"}, 200
@@ -214,9 +321,9 @@ class MpesaCallbackResource(Resource):
             logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
             return {"ResultCode": 1, "ResultDesc": "Payment record not found"}, 404
 
-
 # Define the request parser for ticket buying operations
 ticket_parser = reqparse.RequestParser()
+ticket_parser.add_argument('user_id', type=int, required=True, help='User ID is required')
 ticket_parser.add_argument('ticket_type', type=str, required=True, help='Ticket type is required')
 ticket_parser.add_argument('quantity', type=int, required=True, help='Quantity is required')
 ticket_parser.add_argument('phone_number', type=str, required=True, help='Phone number is required')
