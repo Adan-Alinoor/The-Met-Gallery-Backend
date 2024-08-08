@@ -5,12 +5,13 @@ import os
 import threading
 import time
 from datetime import datetime
-
+from flask_jwt_extended import jwt_required
 import requests
 from dotenv import load_dotenv
 from flask import request, current_app
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
+
 
 from models import db, Ticket, Booking, User, Payment
 
@@ -114,6 +115,46 @@ class TicketResource(Resource):
                 "AccountReference": f"Booking ('booking.id')",
                 "TransactionDesc": "Payment for event ticket purchase. Thank you for your order!"
             }
+class CheckoutResource(Resource):
+    def initiate_mpesa_payment(self, payment_data):
+        user_id = payment_data.get('user_id')
+        booking_id = payment_data.get('booking_id')
+        phone_number = payment_data.get('phone_number')
+        amount = payment_data.get('amount')
+
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        booking = Booking.query.get(booking_id)
+        if not booking:
+            return {'error': 'Booking not found'}, 404
+
+        # Create a new Payment record
+        payment = Payment(user_id=user.id, amount=amount, phone_number=phone_number)
+        db.session.add(payment)
+        db.session.commit()
+        
+        # Call M-Pesa API to initiate payment
+        access_token = get_mpesa_access_token()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+        payload = {
+            "BusinessShortCode": SHORTCODE,
+            "Password": password,
+            "Timestamp": timestamp,
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": amount,
+            "PartyA": phone_number,
+            "PartyB": SHORTCODE,
+            "PhoneNumber": phone_number,
+            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback", 
+            "AccountReference": f"Booking{booking.id}",
+            "TransactionDesc": "Payment for booking"
+        }
 
             try:
                 response = requests.post(
@@ -241,6 +282,7 @@ class TicketResource(Resource):
         
         
 class MpesaCallbackResource(Resource):
+    
     def post(self):
         """
         Handles the M-Pesa callback for payment status updates.
@@ -285,3 +327,68 @@ ticket_parser.add_argument('user_id', type=int, required=True, help='User ID is 
 ticket_parser.add_argument('ticket_type', type=str, required=True, help='Ticket type is required')
 ticket_parser.add_argument('quantity', type=int, required=True, help='Quantity is required')
 ticket_parser.add_argument('phone_number', type=str, required=True, help='Phone number is required')
+
+
+class TicketResource(Resource):
+    @jwt_required()
+    def get(self):
+        """
+        Retrieves all available ticket types.
+        """
+        tickets = Ticket.query.all()
+        return jsonify([ticket.to_dict() for ticket in tickets])
+    @jwt_required()
+    def post(self):
+        """
+        Handles ticket purchase and payment initiation via M-Pesa.
+        """
+        args = ticket_parser.parse_args()
+        ticket_type = args['ticket_type']
+        quantity = args['quantity']
+        phone_number = args['phone_number']
+
+        # Validate phone number format
+        if not phone_number.startswith("2547") or len(phone_number) != 12:
+            return {"error": "Invalid phone number"}, 400
+
+        # Find the ticket type in the database
+        ticket = Ticket.query.filter_by(type_name=ticket_type).first()
+
+        if not ticket:
+            return make_response(jsonify({'message': 'Invalid ticket type'}), 400)
+
+        # Check if there are enough tickets available
+        if ticket.quantity < quantity:
+            return make_response(jsonify({'message': 'Not enough tickets available'}), 400)
+
+        # Calculate the total amount to be paid
+        amount = ticket.price * quantity
+
+        # Create a new Booking record
+        user_id = 1  # Replace with actual user ID (e.g., from session or login) after authentication
+        booking = Booking(user_id=user_id, event_id=ticket.event_id, ticket_id=ticket.id, status='pending')
+        db.session.add(booking)
+        db.session.commit()
+
+        # Initiate payment through M-Pesa
+        payment_data = {
+            'user_id': user_id,
+            'booking_id': booking.id,
+            'phone_number': phone_number,
+            'amount': amount
+        }
+
+        # Create an instance of CheckoutResource
+        checkout_resource = CheckoutResource()
+        payment_response = checkout_resource.initiate_mpesa_payment(payment_data)
+
+        if payment_response[1] != 201:
+            return {'error': 'Failed to initiate payment'}, 400
+
+        return {
+            'message': 'Ticket purchased and payment initiated successfully',
+            'booking_id': booking.id,
+            'payment_response': payment_response
+        }, 201
+
+
