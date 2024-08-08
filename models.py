@@ -310,6 +310,10 @@ class ShippingAddress(db.Model, SerializerMixin):
             'country': self.country,
             'phone': self.phone
         }
-
-
-
+      
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender = db.Column(db.String(80), nullable=False)
+    recipient = db.Column(db.String(80), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now(datetime.UTC))

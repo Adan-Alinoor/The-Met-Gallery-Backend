@@ -1,8 +1,7 @@
-
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message
 import bcrypt
 import base64
 from datetime import datetime
@@ -24,6 +23,8 @@ from Resources.ticket import MpesaCallbackResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 
+from flask_socketio import SocketIO, send, emit
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
@@ -31,6 +32,7 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CALLBACK_SECRET = 'your_secret_key_here'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 migrate = Migrate(app, db)
@@ -838,6 +840,57 @@ class ViewCartResource(Resource):
         cart_items_list = [item.to_dict() for item in cart_items]
 
         return {'items': cart_items_list}, 200
+      
+@app.route('/messages', methods=['POST'])
+@jwt_required()
+def send_message():
+    data = request.json
+    recipient_id = data.get('recipient_id')
+    message_text = data.get('message')
+    sender_id = get_jwt_identity()
+
+    if not recipient_id or not message_text:
+        return jsonify({"error": "Invalid data"}), 400
+
+    new_message = Message(sender=sender_id, recipient=recipient_id, message=message_text)
+    db.session.add(new_message)
+    db.session.commit()
+
+    socketio.emit('new_message', {
+        'sender': sender_id,
+        'recipient': recipient_id,
+        'message': message_text,
+        'timestamp': new_message.timestamp.isoformat()
+    }, broadcast=True)
+
+    return jsonify({"message": "Message sent"}), 201
+
+@app.route('/messages', methods=['GET'])
+@jwt_required()
+def get_messages():
+    user_id = get_jwt_identity()
+    messages = Message.query.filter((Message.sender == user_id) | (Message.recipient == user_id)).all()
+    
+    return jsonify([{
+        'id': msg.id,
+        'sender': msg.sender,
+        'recipient': msg.recipient,
+        'message': msg.message,
+        'timestamp': msg.timestamp.isoformat()
+    } for msg in messages])
+    
+@socketio.on('message')
+def handle_message(msg):
+    print('Message: ' + msg)
+    send(msg, broadcast=True)
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
     
 
 
@@ -875,7 +928,4 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
-
-
+    socketio.run(app, debug=True)
