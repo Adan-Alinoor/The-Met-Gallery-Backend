@@ -474,12 +474,11 @@ class CheckoutResource(Resource):
         if not order:
             return {'error': 'Order not found'}, 404
 
-
+        # Create a new Payment record
         payment = Payment(
             user_id=user.id,
             order_id=order.id,
             amount=amount,
-
             phone_number=phone_number,
             transaction_id=None,  # Placeholder for the transaction ID
             status='pending',
@@ -505,33 +504,7 @@ class CheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
-            "AccountReference": f"Order{order.id}",
-            "TransactionDesc": "Payment for order"
-        }
-
-            phone_number=phone_number
-        )
-        db.session.add(payment)
-        db.session.commit()
-
-        # Call M-Pesa API to initiate payment
-        access_token = get_mpesa_access_token()
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
-        password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
-        payload = {
-            "BusinessShortCode": SHORTCODE,
-            "Password": password,
-            "Timestamp": timestamp,
-            "TransactionType": "CustomerPayBillOnline",
-            "Amount": amount,
-            "PartyA": phone_number,
-            "PartyB": SHORTCODE,
-            "PhoneNumber": phone_number,
-            "CallBackURL": "https://ce71-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+            "CallBackURL": "https://your-callback-url/callback",  # Replace with your callback URL
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -553,122 +526,84 @@ class CheckoutResource(Resource):
                 db.session.commit()
                 return {'message': 'Payment initiated successfully', 'transaction_desc': payment.transaction_desc}, 201
             else:
+                payment.status = 'failed'
+                db.session.commit()
                 return {'error': 'Failed to initiate payment'}, 400
 
         except requests.exceptions.RequestException as e:
             logging.error(f'Error calling M-Pesa API: {e}')
-            return {'error': 'Failed to connect to M-Pesa API'}, 500
-        except ValueError:
-            logging.error(f'Invalid JSON response: {response.text}')
-            return {'error': 'Invalid response from M-Pesa API'}, 500
-
-
-    def post(self):
-        data = request.get_json()
-
-        try:
-            response = requests.post(
-                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                headers=headers,
-                json=payload
-            )
-            logging.debug(f'M-Pesa API Response: {response.text}')
-            response_data = response.json()
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error calling M-Pesa API: {e}')
-            return {'error': 'Failed to connect to M-Pesa API'}, 500
-        except ValueError:
-            logging.error(f'Invalid JSON response: {response.text}')
-            return {'error': 'Invalid response from M-Pesa API'}, 500
-
-        if response_data.get('ResponseCode') == '0':
-            payment.transaction_id = response_data['CheckoutRequestID']
-            payment.status = 'initiated'
-            db.session.commit()
-            return {'message': 'Payment initiated successfully'}, 201
-        else:
             payment.status = 'failed'
             db.session.commit()
-            return {'error': 'Failed to initiate payment'}, 400
+            return {'error': 'Failed to connect to M-Pesa API'}, 500
+        except ValueError:
+            logging.error(f'Invalid JSON response: {response.text}')
+            payment.status = 'failed'
+            db.session.commit()
+            return {'error': 'Invalid response from M-Pesa API'}, 500
 
     @jwt_required()
     def post(self):
-        # Extract user ID from JWT
-        current_user = get_jwt_identity()
-        user_id = current_user.get('id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+        try:
+            current_user = get_jwt_identity()
+            user_id = current_user.get('id')
+            if not user_id:
+                return {'error': 'User ID is required'}, 400
 
-        data = request.get_json()
-        if not data:
-            return {'error': 'No input data provided'}, 400
+            data = request.get_json()
+            if not data:
+                return {'error': 'No input data provided'}, 400
 
-        phone_number = data.get('phone_number')
-        if not phone_number:
-            return {'error': 'Phone number is required'}, 400
+            phone_number = data.get('phone_number')
+            if not phone_number:
+                return {'error': 'Phone number is required'}, 400
 
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
+            user = User.query.get(user_id)
+            if not user:
+                return {'error': 'User not found'}, 404
 
-        # Check if shipping address exists for the user
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if not shipping_address:
-            return {'error': 'Shipping address is required'}, 400
+            # Check if shipping address exists for the user
+            shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
+            if not shipping_address:
+                return {'error': 'Shipping address is required'}, 400
 
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart or not cart.items:
-            return {'error': 'Cart is empty'}, 400
+            cart = Cart.query.filter_by(user_id=user.id).first()
+            if not cart or not cart.items:
+                return {'error': 'Cart is empty'}, 400
 
-        selected_items = data.get('items', [])
-        if not selected_items:
-            return {'error': 'No items selected for checkout'}, 400
+            selected_items = data.get('items', [])
+            if not selected_items:
+                return {'error': 'No items selected for checkout'}, 400
 
-        order = Order(user_id=user.id)
-        db.session.add(order)
+            order = Order(user_id=user.id)
+            db.session.add(order)
 
-        total_amount = 0
-        for selected_item in selected_items:
-            artwork_id = selected_item.get('artwork_id')
-            quantity = selected_item.get('quantity', 1)
+            total_amount = 0
+            for selected_item in selected_items:
+                artwork_id = selected_item.get('artwork_id')
+                quantity = selected_item.get('quantity', 1)
 
-            cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-            if not cart_item or cart_item.quantity < quantity:
-                return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
+                cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+                if not cart_item or cart_item.quantity < quantity:
+                    return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
 
-            total_amount += cart_item.price * quantity
-            order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
-            db.session.add(order_item)
+                total_amount += cart_item.price * quantity
+                order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
+                db.session.add(order_item)
 
-            if cart_item.quantity > quantity:
-                cart_item.quantity -= quantity
-            else:
-                db.session.delete(cart_item)
+                if cart_item.quantity > quantity:
+                    cart_item.quantity -= quantity
+                else:
+                    db.session.delete(cart_item)
 
-            db.session.commit()
+            db.session.commit()  # Commit the order and order items
 
-        payment_data = {
-            'user_id': user.id,
-            'order_id': order.id,
-            'phone_number': phone_number,
-            'amount': total_amount
-        }
+            payment_data = {
+                'user_id': user.id,
+                'order_id': order.id,
+                'phone_number': phone_number,
+                'amount': total_amount
+            }
 
-
-        payment_response = self.initiate_mpesa_payment(payment_data)
-
-        if payment_response[1] != 201:
-                db.session.rollback()  # Rollback cart item removal if payment fails
-                return {'error': 'Failed to initiate payment'}, 400
-
-        return {
-            'message': 'Order created and payment initiated successfully',
-            'order_id': order.id,
-            'payment_response': payment_response
-        }, 201
-
-
-            # Initiate payment through M-Pesa
             payment_response, status_code = self.initiate_mpesa_payment(payment_data)
 
             if status_code != 201:
@@ -676,7 +611,7 @@ class CheckoutResource(Resource):
                 return payment_response, 400
 
             return {
-                'message': 'Order placed and payment initiated successfully',
+                'message': 'Order created and payment initiated successfully',
                 'order_id': order.id,
                 'transaction_desc': payment_response.get('transaction_desc')
             }, 201
@@ -689,14 +624,6 @@ class CheckoutResource(Resource):
         except Exception as e:
             db.session.rollback()
             return {'error': f'Failed to process order: {str(e)}'}, 500
-
-
-# Callback URL handler to update payment status
-
-        except SQLAlchemyError as e:
-            db.session.rollback()  # Rollback changes if there's a database error
-            logging.error(f'Database error: {e}')
-            return {'error': 'An error occurred while processing the order'}, 500
 
 
 
@@ -753,6 +680,7 @@ def mpesa_callback():
 
         
 class ShippingResource(Resource):
+    @user_required
     def get(self, user_id):
         # Fetch the shipping address for the user
         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
@@ -761,12 +689,59 @@ class ShippingResource(Resource):
 
         return shipping_address.to_dict(), 200
 
-        logging.debug(f'Payment status updated to: {payment.status}')
-        return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
-    else:
-        logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
-        return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
-    
+    @user_required
+    def post(self):
+        data = request.get_json()
+
+        user_id = data.get('user_id')
+        address = data.get('address')
+        city = data.get('city')
+        country = data.get('country')
+        phone = data.get('phone')
+        full_name = data.get('full_name')
+        email = data.get('email')
+
+        if not all([user_id, address, city, country, phone, full_name, email]):
+            return {'error': 'All fields are required'}, 400
+
+        # Check if a shipping address already exists for the user
+        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
+        if shipping_address:
+            return {'error': 'Shipping address already exists for this user'}, 400
+
+        new_address = ShippingAddress(
+            user_id=user_id,
+            address=address,
+            city=city,
+            country=country,
+            phone=phone,
+            full_name=full_name,
+            email=email
+        )
+
+        db.session.add(new_address)
+        db.session.commit()
+
+        return {'message': 'Shipping address created successfully', 'address': new_address.to_dict()}, 201
+
+    @user_required
+    def put(self, user_id):
+        data = request.get_json()
+        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
+        if not shipping_address:
+            return {'error': 'Shipping address not found'}, 404
+
+        shipping_address.address = data.get('address', shipping_address.address)
+        shipping_address.city = data.get('city', shipping_address.city)
+        shipping_address.country = data.get('country', shipping_address.country)
+        shipping_address.phone = data.get('phone', shipping_address.phone)
+        shipping_address.full_name = data.get('full_name', shipping_address.full_name)
+        shipping_address.email = data.get('email', shipping_address.email)
+
+        db.session.commit()
+
+        return {'message': 'Shipping address updated successfully', 'address': shipping_address.to_dict()}, 200
+
 
 
 class AddToCartResource(Resource):
@@ -912,31 +887,7 @@ api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
 
-    def put(self, user_id):
-        data = request.get_json()
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if not shipping_address:
-            return {'error': 'Shipping address not found'}, 404
 
-        address = data.get('address', shipping_address.address)
-        city = data.get('city', shipping_address.city)
-        country = data.get('country', shipping_address.country)
-        phone = data.get('phone', shipping_address.phone)
-        full_name = data.get('full_name', shipping_address.full_name)
-        email = data.get('email', shipping_address.email)
-
-        shipping_address.address = address
-        shipping_address.city = city
-        shipping_address.country = country
-        shipping_address.phone = phone
-        shipping_address.full_name = full_name
-        shipping_address.email = email
-
-        db.session.commit()
-
-        return {'message': 'Shipping address updated successfully', 'address': shipping_address.to_dict()}, 200
-
-api.add_resource(CheckoutResource, '/checkout')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 
