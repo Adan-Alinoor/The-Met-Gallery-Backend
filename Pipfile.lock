@@ -3,18 +3,12 @@
         "hash": {
 
  
-            "sha256": "f986e19b55ccd2fff51a172657704a0f10cef6951d17d090360ab36802c51cbe"
-
-            "sha256": "7ce0d45f5ee3352d547155d654a149b4d65dbb567be9857c9bc29ea119cf673b"
- 
-            "sha256": "c777d0f3070665eed7f7e7699e3157fae21c38cc722ac1b508ce77adbb3e5136"
-            "sha256": "2d78a0e417e854e1c633269c4ab266094340eb5e6c5c2911a4100fded1e0c507"
-
-            "sha256": "f986e19b55ccd2fff51a172657704a0f10cef6951d17d090360ab36802c51cbe"
-
-            "sha256": "7ce0d45f5ee3352d547155d654a149b4d65dbb567be9857c9bc29ea119cf673b"
-
-            "sha256": "2d78a0e417e854e1c633269c4ab266094340eb5e6c5c2911a4100fded1e0c507"
+            "sha256": [
+                "f986e19b55ccd2fff51a172657704a0f10cef6951d17d090360ab36802c51cbe",
+                "7ce0d45f5ee3352d547155d654a149b4d65dbb567be9857c9bc29ea119cf673b",
+                "c777d0f3070665eed7f7e7699e3157fae21c38cc722ac1b508ce77adbb3e5136",
+                "2d78a0e417e854e1c633269c4ab266094340eb5e6c5c2911a4100fded1e0c507"
+            ]
         },
         "pipfile-spec": 6,
         "requires": {
