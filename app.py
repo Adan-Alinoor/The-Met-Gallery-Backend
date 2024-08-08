@@ -1,20 +1,34 @@
+import base64
+from datetime import datetime
+import os
 from flask import Flask, request, jsonify
-from flask_restful import Api, Resource, reqparse
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+import requests
+from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from model import db, User  
+from flask_restful import Resource, Api, reqparse
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+
+from models import db,User, Cart, CartItem, Order, Payment, OrderItem, Artwork
+import logging
+from flask_cors import CORS
 import bcrypt
-from auth import admin_required
+
+from auth import user_required, admin_required
+
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
+CALLBACK_SECRET = 'your_secret_key_here'
 
-db.init_app(app) 
+
 migrate = Migrate(app, db)
+db.init_app(app) 
 jwt = JWTManager(app)
 api = Api(app)
+CORS(app)
 
 class Signup(Resource):
     def post(self):
@@ -46,9 +60,14 @@ class Login(Resource):
         
         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             access_token = create_access_token(identity=user.id)
-            return jsonify({'message': f"{user.role.capitalize()} logged in successfully", 'access_token': access_token})
+            return jsonify({
+                'message': f"{user.role.capitalize()} logged in successfully",
+                'access_token': access_token,
+                'role': user.role  # Include the user's role in the response
+            })
         
         return jsonify({'message': 'Invalid email or password'}), 401
+
 
 class Logout(Resource):
     @jwt_required()
@@ -115,49 +134,8 @@ class AdminResource(Resource):
     def get(self):
         return {'message': 'Admin content accessible'}
 
-api.add_resource(Signup, '/signup')
-api.add_resource(Login, '/login')
-api.add_resource(Logout, '/logout')
-api.add_resource(UserResource, '/user')
-api.add_resource(AdminResource, '/admin')
-
-if __name__ == '__main__':
-    app.run(debug=True)
-
-
-import base64
-from datetime import datetime
-import os
-from flask import Flask, request, jsonify
-import requests
-from flask_migrate import Migrate
-
-from Resources.event import EventsResource
-from Resources.ticket import TicketResource
-from Resources.ticket import MpesaCallbackResource
-from Resources.ticket import CheckoutResource
-from Resources.booking import BookingResource
-from Resources.admin_ticket import TicketAdminResource
-from flask_cors import CORS
-
-from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events, Booking, Ticket
-
-import logging
-
-
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-
-db.init_app(app)
-migrate = Migrate(app, db)
-api = Api(app)
-
-
-
 class ArtworkListResource(Resource):
+    @user_required
     def get(self):
         try:
             artworks = Artwork.query.all()
@@ -165,6 +143,7 @@ class ArtworkListResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+    @user_required  # Only authenticated users can post artwork
     def post(self):
         data = request.get_json()
         if not data:
@@ -185,15 +164,16 @@ class ArtworkListResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
 class ArtworkResource(Resource):
+    @user_required  
     def get(self, id):
         try:
             artwork = Artwork.query.get_or_404(id)
             return artwork.to_dict(), 200
         except Exception as e:
             return {"error": str(e)}, 500
-
+    
+    @user_required  
     def put(self, id):
         data = request.get_json()
         if not data:
@@ -210,6 +190,7 @@ class ArtworkResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+    @user_required  # Allow any authenticated user to delete artwork
     def delete(self, id):
         try:
             artwork = Artwork.query.get_or_404(id)
@@ -218,29 +199,14 @@ class ArtworkResource(Resource):
             return {"message": "Artwork deleted"}, 200
         except Exception as e:
             return {"error": str(e)}, 500
-          
-          
+
+
+        
 class Home(Resource):
     def get(self):
         response_dict = {"message": "Welcome to The Met Gallery"}
         return jsonify(response_dict)
 
-# Add the EventsResource class as a resource to the API
-api.add_resource(Home, '/')
-
-api.add_resource(EventsResource, '/events', '/events/<int:id>')
-api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
-api.add_resource(MpesaCallbackResource, '/callback')
-api.add_resource(CheckoutResource, '/checkout')
-api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
-api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
-api.add_resource(ArtworkListResource, '/artworks')
-api.add_resource(ArtworkResource, '/artworks/<int:id>')
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Load environment variables for M-Pesa
 CONSUMER_KEY = os.getenv('CONSUMER_KEY')
 CONSUMER_SECRET = os.getenv('CONSUMER_SECRET')
 SHORTCODE = os.getenv('SHORTCODE')
@@ -273,9 +239,9 @@ def generate_password(shortcode, passkey):
     return encoded_string.decode('utf-8'), timestamp
 
 
-
 class CheckoutResource(Resource):
-    def initiate_mpesa_payment(self, payment_data):
+    @staticmethod
+    def initiate_mpesa_payment(payment_data):
         user_id = payment_data.get('user_id')
         order_id = payment_data.get('order_id')
         phone_number = payment_data.get('phone_number')
@@ -289,8 +255,17 @@ class CheckoutResource(Resource):
         if not order:
             return {'error': 'Order not found'}, 404
 
-        # Create a new Payment record
-        payment = Payment(user_id=user.id, order_id=order.id, amount=amount, phone_number=phone_number)
+        # Create a new Payment record with a pending status
+        payment = Payment(
+            user_id=user.id,
+            order_id=order.id,
+            amount=amount,
+            phone_number=phone_number,
+            transaction_id=None,  # Placeholder for the transaction ID
+            status='pending',
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
         db.session.add(payment)
         db.session.commit()
 
@@ -310,7 +285,7 @@ class CheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://f318-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -321,7 +296,6 @@ class CheckoutResource(Resource):
                 headers=headers,
                 json=payload
             )
-
             logging.debug(f'M-Pesa API Response: {response.text}')
             response_data = response.json()
         except requests.exceptions.RequestException as e:
@@ -337,14 +311,25 @@ class CheckoutResource(Resource):
             db.session.commit()
             return {'message': 'Payment initiated successfully'}, 201
         else:
+            payment.status = 'failed'
+            db.session.commit()
             return {'error': 'Failed to initiate payment'}, 400
 
+    @jwt_required()
     def post(self):
-        data = request.get_json()
-
-        user_id = data.get('user_id')
+        # Extract user ID from JWT
+        current_user = get_jwt_identity()
+        user_id = current_user.get('id')
         if not user_id:
             return {'error': 'User ID is required'}, 400
+
+        data = request.get_json()
+        if not data:
+            return {'error': 'No input data provided'}, 400
+
+        phone_number = data.get('phone_number')
+        if not phone_number:
+            return {'error': 'Phone number is required'}, 400
 
         user = User.query.get(user_id)
         if not user:
@@ -364,18 +349,17 @@ class CheckoutResource(Resource):
 
         total_amount = 0
         for selected_item in selected_items:
-            product_id = selected_item.get('product_id')
+            artwork_id = selected_item.get('artwork_id')
             quantity = selected_item.get('quantity', 1)
 
-            cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product_id).first()
+            cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
             if not cart_item or cart_item.quantity < quantity:
-                return {'error': f'Invalid quantity for product ID {product_id}'}, 400
+                return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
 
             total_amount += cart_item.price * quantity
-            order_item = OrderItem(order_id=order.id, product_id=product_id, quantity=quantity, price=cart_item.price)
+            order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
             db.session.add(order_item)
 
-            # Decrement the quantity or remove the CartItem
             if cart_item.quantity > quantity:
                 cart_item.quantity -= quantity
             else:
@@ -386,11 +370,10 @@ class CheckoutResource(Resource):
         payment_data = {
             'user_id': user.id,
             'order_id': order.id,
-            'phone_number': data.get('phone_number'),
+            'phone_number': phone_number,
             'amount': total_amount
         }
 
-        # Initiate payment through M-Pesa
         payment_response = self.initiate_mpesa_payment(payment_data)
 
         if payment_response[1] != 201:
@@ -401,10 +384,6 @@ class CheckoutResource(Resource):
             'order_id': order.id,
             'payment_response': payment_response
         }, 201
-
-
-
-
 
 
 @app.route('/callback', methods=['POST'])
@@ -418,6 +397,12 @@ def mpesa_callback():
         logging.error("No data received in callback")
         return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
     
+    # Validate secret key (example)
+    secret_key = request.headers.get('X-Callback-Secret')
+    if secret_key != CALLBACK_SECRET:
+        logging.error("Invalid callback secret")
+        return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
+
     # Process the callback data and update payment status
     try:
         stk_callback = data['Body']['stkCallback']
@@ -451,14 +436,13 @@ def mpesa_callback():
         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
 
 
-# ... AddToCartResource, RemoveFromCartResource, ViewCartResource, and CheckoutResource classes ...
-#handles cart
+
 class AddToCartResource(Resource):
+    @user_required 
     def post(self):
         data = request.get_json()
 
-        # Find or create user (assuming a user is authenticated and user_id is available)
-        user_id = data.get('user_id')  # Adjust this line as per your authentication system
+        user_id = data.get('user_id')
         if not user_id:
             return {'error': 'User ID is required'}, 400
 
@@ -466,69 +450,59 @@ class AddToCartResource(Resource):
         if not user:
             return {'error': 'User not found'}, 404
 
-        # Find or create cart for the user
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             cart = Cart(user_id=user.id)
             db.session.add(cart)
             db.session.commit()
 
-        # Check if product exists
-        product = Product.query.get(data['product_id'])
-        if not product:
-            return {'error': 'Product not found'}, 404
+        artwork = Artwork.query.get(data['artwork_id'])
+        if not artwork:
+            return {'error': 'Artwork not found'}, 404
 
-        # Get the quantity to add
-        quantity = data.get('quantity', 1)  # Default to 1 if quantity is not provided
+        quantity = data.get('quantity', 1)
 
-        # Check if the product is already in the cart
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product.id).first()
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
         if cart_item:
-            # Update the quantity if the product is already in the cart
-            cart_item.quantity += quantity  # Adjust quantity increment as needed
+            cart_item.quantity += quantity
         else:
-            # Add new CartItem if the product is not in the cart
             cart_item = CartItem(
                 cart_id=cart.id,
-                product_id=product.id,
-                quantity=quantity, # Adjust quantity as needed
-                name = product.name,
-                description=product.description,
-                price=product.price,
-                image=product.image
+                artwork_id=artwork.id,
+                quantity=quantity,
+                title=artwork.title,
+                description=artwork.description,
+                price=artwork.price,
+                image=artwork.image
             )
             db.session.add(cart_item)
 
         db.session.commit()
 
-        return {'message': 'Product added to cart'}, 201
-
+        return {'message': 'Artwork added to cart'}, 201
 
 class RemoveFromCartResource(Resource):
+    @user_required  # Ensure the user is authenticated
     def post(self):
         data = request.get_json()
 
-        # Find or create user (assuming a user is authenticated and user_id is available)
-        user_id = data.get('user_id')  # Adjust this line as per your authentication system
-        product_id = data.get('product_id')
-        if not user_id or not product_id:
-            return {'error': 'User ID and Product ID are required'}, 400
+        user_id = data.get('user_id')
+        artwork_id = data.get('artwork_id')
+        if not user_id or not artwork_id:
+            return {'error': 'User ID and artwork ID are required'}, 400
 
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
 
-        # Find the user's cart
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             return {'error': 'Cart not found'}, 404
 
-        # Find the CartItem to be removed
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product_id).first()
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
-            return {'error': 'Product not found in cart'}, 404
+            return {'error': 'Artwork not found in cart'}, 404
 
-        # Decrement the quantity or remove the CartItem
         if cart_item.quantity > 1:
             cart_item.quantity -= 1
         else:
@@ -536,39 +510,57 @@ class RemoveFromCartResource(Resource):
 
         db.session.commit()
 
-        return {'message': 'Product removed from cart'}, 200
-
+        return {'message': 'Artwork removed from cart'}, 200
 
 class ViewCartResource(Resource):
+    @user_required
     def get(self, user_id):
-        # Find the user's cart
         cart = Cart.query.filter_by(user_id=user_id).first()
         if not cart:
             return {"error": "Cart not found"}, 404
 
-        # Fetch all cart items
         cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
         if not cart_items:
             return {"message": "Cart is empty"}, 200
 
-        # Convert cart items to dictionary format
         cart_items_list = [item.to_dict() for item in cart_items]
+
         return {'items': cart_items_list}, 200
     
+
+
+from Resources.event import EventsResource
+from Resources.ticket import TicketResource
+from Resources.ticket import TicketResource
+
+from Resources.ticket import MpesaCallbackResource
+from Resources.ticket import CheckoutResource
+from Resources.booking import BookingResource
+from Resources.admin_ticket import TicketAdminResource
     
-
-
-
-# api.add_resource(MpesaPaymentResource, '/mpesa_payment')
-api.add_resource(AddToCartResource, '/add_to_cart')
-api.add_resource(RemoveFromCartResource, '/remove_from_cart')
-api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
+api.add_resource(Signup, '/signup')
+api.add_resource(Login, '/login')
+api.add_resource(Logout, '/logout')
+api.add_resource(UserResource, '/user')
+api.add_resource(AdminResource, '/admin')
+api.add_resource(EventsResource, '/events', '/events/<int:id>')
+api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
+api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(CheckoutResource, '/checkout')
+api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
+api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
+api.add_resource(ArtworkListResource, '/artworks')
+api.add_resource(ArtworkResource, '/artworks/<int:id>')
+api.add_resource(AddToCartResource, '/cart/add')
+api.add_resource(RemoveFromCartResource, '/cart/remove')
+api.add_resource(ViewCartResource, '/cart/<int:user_id>')
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 
-if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True, port=5555)
+# Ensure no duplicate resources are added
+api.add_resource(Home, '/')
 
+if __name__ == '__main__':
+    app.run(debug=True)
 

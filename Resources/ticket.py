@@ -3,11 +3,12 @@ import json
 import logging
 import os
 from datetime import datetime
-
+from flask_jwt_extended import jwt_required
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, make_response, request
 from flask_restful import Resource, reqparse
+
 
 from models import db, Ticket, Booking,User, Payment
 
@@ -95,7 +96,7 @@ class CheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://9dee-197-139-44-10.ngrok-free.app/callback", 
+            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback", 
             "AccountReference": f"Booking{booking.id}",
             "TransactionDesc": "Payment for booking"
         }
@@ -173,6 +174,7 @@ class CheckoutResource(Resource):
         }, 201
 
 class MpesaCallbackResource(Resource):
+    
     def post(self):
         """
         Handles the M-Pesa callback for payment status updates.
@@ -219,14 +221,16 @@ ticket_parser.add_argument('ticket_type', type=str, required=True, help='Ticket 
 ticket_parser.add_argument('quantity', type=int, required=True, help='Quantity is required')
 ticket_parser.add_argument('phone_number', type=str, required=True, help='Phone number is required')
 
+
 class TicketResource(Resource):
+    @jwt_required()
     def get(self):
         """
         Retrieves all available ticket types.
         """
         tickets = Ticket.query.all()
         return jsonify([ticket.to_dict() for ticket in tickets])
-
+    @jwt_required()
     def post(self):
         """
         Handles ticket purchase and payment initiation via M-Pesa.
@@ -279,3 +283,5 @@ class TicketResource(Resource):
             'booking_id': booking.id,
             'payment_response': payment_response
         }, 201
+
+

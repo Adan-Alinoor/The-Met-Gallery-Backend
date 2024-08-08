@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin, LoginManager
 from sqlalchemy import MetaData
 from datetime import datetime
 from sqlalchemy_serializer import SerializerMixin
@@ -15,31 +16,49 @@ convention = {
 metadata = MetaData(naming_convention=convention)
 
 db = SQLAlchemy(metadata=metadata)
+login_manager = LoginManager()
 
 class Artwork(db.Model, SerializerMixin):
     __tablename__ = 'artworks'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String, nullable=False)
+    description = db.Column(db.String, nullable=False)
+    price = db.Column(db.Integer, nullable=False)
+    image = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'price': self.price,
+            'image': self.image,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+    serialize_only = ('id', 'title', 'description', 'price', 'image')
 
 
-class User(db.Model, SerializerMixin):
+
+class User(db.Model, SerializerMixin, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, nullable=False, unique=True)
     email = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    role = db.Column(db.String)
+    role = db.Column(db.String(50), nullable=False, default='user')
+    is_admin = db.Column(db.Boolean, default=False)  
+    is_seller = db.Column(db.Boolean, default=False)
     
     cart = db.relationship('Cart', back_populates='user', uselist=False)
     payments = db.relationship('Payment', back_populates='user')
     orders = db.relationship('Order', back_populates='user')
-
     bookings = db.relationship('Booking', back_populates='user')
-    payments = db.relationship('Payment', back_populates='user')
-    
 
-    serialize_only = ('id', 'username', 'email', 'role')
+    serialize_only = ('id', 'username', 'email', 'role', 'is_admin') 
+
 
 class Events(db.Model, SerializerMixin):
     __tablename__ = 'events'
@@ -137,25 +156,6 @@ class Ticket(db.Model, SerializerMixin):
     def __repr__(self):
         return f"Ticket('{self.event_id}', '{self.type_name}', '{self.price}', '{self.quantity}')"
 
-class Product(db.Model, SerializerMixin):
-    __tablename__ = 'products'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-
-    description = db.Column(db.String, nullable=False)
-    price = db.Column(db.Integer, nullable=False)
-    image = db.Column(db.String, nullable=False)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'name': self.name,
-            'description': self.description,
-            'price': self.price,
-            'image': self.image
-        }
-
 
 
 class Cart(db.Model, SerializerMixin):
@@ -171,33 +171,34 @@ class Cart(db.Model, SerializerMixin):
             'user_id': self.user_id,
             'items': [item.to_dict() for item in self.items]
         }
-
+    
 class CartItem(db.Model, SerializerMixin):
     __tablename__ = 'cart_items'
     id = db.Column(db.Integer, primary_key=True)
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    name = db.Column(db.String, nullable=False)
+    artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
+    title = db.Column(db.String, nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     description = db.Column(db.String, nullable=False)
     image = db.Column(db.String(200), nullable=False)
 
-    product = db.relationship('Product')
+    artwork = db.relationship('Artwork')
     cart = db.relationship('Cart', back_populates='items')
     
     def to_dict(self):
         return {
             'id': self.id,
             'cart_id': self.cart_id,
-            'product_id': self.product_id,
+            'artwork_id': self.artwork_id,  # Changed from 'product_id' to 'artwork_id'
             'quantity': self.quantity,
             'price': self.price,
-            'name': self.name,
+            'title': self.title,
             'description': self.description,
             'image': self.image,
-            'product': self.product.to_dict()
+            'artwork': self.artwork.to_dict()  # Updated to 'artwork'
         }
+
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -212,12 +213,24 @@ class OrderItem(db.Model):
     __tablename__ = 'order_items'
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     
     order = db.relationship('Order', back_populates='items')
-    product = db.relationship('Product')
+    artwork = db.relationship('Artwork')  # Changed from 'Product' to 'Artwork'
+
+    def to_dict(self):
+        return{
+            'id': self.id,
+            'order_id': self.order_id,
+            'artwork_id': self.artwork_id,  
+            'quantity': self.quantity,
+            'price': self.price,
+            'artwork': self.artwork.to_dict() 
+        }
+      
+
 
 
 class Payment(db.Model):
@@ -238,4 +251,3 @@ class Payment(db.Model):
     bookings = db.relationship('Booking', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
     
-
