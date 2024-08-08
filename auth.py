@@ -3,6 +3,7 @@ from functools import wraps
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from models import User
 
+
 def user_required(fn):
     @wraps(fn)
     @jwt_required()
@@ -35,5 +36,4 @@ def admin_or_seller_required(fn):
             return {'error': 'Admin or seller access required'}, 403
         return fn(*args, **kwargs)
     return wrapper
-
 
