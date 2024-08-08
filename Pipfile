@@ -16,15 +16,9 @@ sqlalchemy = "*"
 python-dotenv = "*"
 faker = "*"
 requests = "*"
-flask = "*"
-flask-sqlalchemy = "*"
 flask-login = "*"
-sqlalchemy = "*"
-flask-restful = "*"
-flask-migrate = "*"
 bcrypt = "*"
 marshmallow = "*"
-flask-jwt-extended = "*"
 
 [dev-packages]
 

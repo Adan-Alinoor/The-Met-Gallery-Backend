@@ -220,9 +220,9 @@ class OrderItem(db.Model):
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
     amount = db.Column(db.Integer, nullable=False)
     phone_number = db.Column(db.String(15), nullable=False)
     transaction_id = db.Column(db.String(50), nullable=True)
@@ -230,9 +230,8 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     result_desc = db.Column(db.String(255), nullable=True)
+    payment_type = db.Column(db.String(20), nullable=False)
 
     user = db.relationship('User', back_populates='payments')
     bookings = db.relationship('Booking', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
-    
-

@@ -2,19 +2,35 @@ from flask import Flask, request, jsonify
 from flask_restful import Api, Resource, reqparse
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_migrate import Migrate
-from models import db, User  
+from models import db, User, Cart, CartItem, Order, Payment,OrderItem, Artwork
 import bcrypt
 from auth import admin_required
 
+import base64
+from datetime import datetime
+import os
+import requests
+from sqlalchemy.exc import SQLAlchemyError
+
+from Resources.event import EventsResource
+from Resources.ticket import TicketResource
+from Resources.ticket import MpesaCallbackResource
+from Resources.booking import BookingResource
+from Resources.admin_ticket import TicketAdminResource
+from flask_cors import CORS
+import logging
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app) 
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
 api = Api(app)
+
 
 class Signup(Resource):
     def post(self):
@@ -121,40 +137,6 @@ api.add_resource(Logout, '/logout')
 api.add_resource(UserResource, '/user')
 api.add_resource(AdminResource, '/admin')
 
-if __name__ == '__main__':
-    app.run(debug=True)
-
-
-import base64
-from datetime import datetime
-import os
-from flask import Flask, request, jsonify
-import requests
-from flask_migrate import Migrate
-
-from Resources.event import EventsResource
-from Resources.ticket import TicketResource
-from Resources.ticket import MpesaCallbackResource
-from Resources.ticket import CheckoutResource
-from Resources.booking import BookingResource
-from Resources.admin_ticket import TicketAdminResource
-from flask_cors import CORS
-
-from flask_restful import Resource, Api
-from models import db, User, Product, Cart, CartItem, Order, Payment,OrderItem, Artwork, Events, Booking, Ticket
-
-import logging
-
-
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-
-db.init_app(app)
-migrate = Migrate(app, db)
-api = Api(app)
-
 
 
 class ArtworkListResource(Resource):
@@ -227,11 +209,9 @@ class Home(Resource):
 
 # Add the EventsResource class as a resource to the API
 api.add_resource(Home, '/')
-
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
-api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
+api.add_resource(TicketResource, '/tickets')
 api.add_resource(MpesaCallbackResource, '/callback')
-api.add_resource(CheckoutResource, '/checkout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
@@ -272,20 +252,82 @@ def generate_password(shortcode, passkey):
     encoded_string = base64.b64encode(data_to_encode.encode())
     return encoded_string.decode('utf-8'), timestamp
 
+def determine_payment_type(payment_data):
+    if payment_data.get('order_id'):
+        return 'artwork'
+    elif payment_data.get('booking_id'):
+        return 'event'
+    else:
+        raise ValueError("Cannot determine payment type from provided data")
 
+def create_payment(payment_data):
+    payment_type = determine_payment_type(payment_data)
+    
+    payment = Payment(
+        user_id=payment_data.get('user_id'),
+        booking_id=payment_data.get('booking_id'),
+        order_id=payment_data.get('order_id') if payment_type == 'artwork' else None,
+        amount=payment_data['amount'],
+        phone_number=payment_data.get('phone_number'),
+        transaction_id=payment_data.get('transaction_id'),
+        status=payment_data.get('status'),
+        result_desc=payment_data.get('result_desc'),
+        payment_type=payment_type
+    )
+    db.session.add(payment)
+    db.session.commit()
 
-from flask import Flask, request, jsonify
-import requests
-from sqlalchemy.exc import SQLAlchemyError
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork
-from flask_restful import Resource
+    # Call M-Pesa API to initiate payment
+    access_token = get_mpesa_access_token()
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+    password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+    payload = {
+        "BusinessShortCode": SHORTCODE,
+        "Password": password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": payment_data['amount'],
+        "PartyA": payment_data['phone_number'],
+        "PartyB": SHORTCODE,
+        "PhoneNumber": payment_data['phone_number'],
+        "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+        "AccountReference": f"Order{payment_data.get('order_id')}",
+        "TransactionDesc": "Payment for order"
+    }
+
+    try:
+        response = requests.post(
+            "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+            headers=headers,
+            json=payload
+        )
+
+        logging.debug(f'M-Pesa API Response: {response.text}')
+        response_data = response.json()
+    except requests.exceptions.RequestException as e:
+        logging.error(f'Error calling M-Pesa API: {e}')
+        return {'error': 'Failed to connect to M-Pesa API'}, 500
+    except ValueError:
+        logging.error(f'Invalid JSON response: {response.text}')
+        return {'error': 'Invalid response from M-Pesa API'}, 500
+
+    if response_data.get('ResponseCode') == '0':
+        payment.transaction_id = response_data['CheckoutRequestID']
+        payment.status = 'initiated'
+        db.session.commit()
+        return {'message': 'Payment initiated successfully'}, 201
+    else:
+        return {'error': 'Failed to initiate payment'}, 400
 
 class CheckoutResource(Resource):
     def initiate_mpesa_payment(self, payment_data):
         user_id = payment_data.get('user_id')
         order_id = payment_data.get('order_id')
         phone_number = payment_data.get('phone_number')
-        amount = payment_data.get('amount')
+        amount = payment_data['amount']
 
         user = User.query.get(user_id)
         if not user:
@@ -295,55 +337,7 @@ class CheckoutResource(Resource):
         if not order:
             return {'error': 'Order not found'}, 404
 
-        # Create a new Payment record
-        payment = Payment(user_id=user.id, order_id=order.id, amount=amount, phone_number=phone_number)
-        db.session.add(payment)
-        db.session.commit()
-
-        # Call M-Pesa API to initiate payment
-        access_token = get_mpesa_access_token()
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
-        password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
-        payload = {
-            "BusinessShortCode": SHORTCODE,
-            "Password": password,
-            "Timestamp": timestamp,
-            "TransactionType": "CustomerPayBillOnline",
-            "Amount": amount,
-            "PartyA": phone_number,
-            "PartyB": SHORTCODE,
-            "PhoneNumber": phone_number,
-            "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
-            "AccountReference": f"Order{order.id}",
-            "TransactionDesc": "Payment for order"
-        }
-
-        try:
-            response = requests.post(
-                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                headers=headers,
-                json=payload
-            )
-
-            logging.debug(f'M-Pesa API Response: {response.text}')
-            response_data = response.json()
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error calling M-Pesa API: {e}')
-            return {'error': 'Failed to connect to M-Pesa API'}, 500
-        except ValueError:
-            logging.error(f'Invalid JSON response: {response.text}')
-            return {'error': 'Invalid response from M-Pesa API'}, 500
-
-        if response_data.get('ResponseCode') == '0':
-            payment.transaction_id = response_data['CheckoutRequestID']
-            payment.status = 'initiated'
-            db.session.commit()
-            return {'message': 'Payment initiated successfully'}, 201
-        else:
-            return {'error': 'Failed to initiate payment'}, 400
+        return create_payment(payment_data)  # Call create_payment function
 
     def post(self):
         data = request.get_json()
@@ -414,11 +408,6 @@ class CheckoutResource(Resource):
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
 
-
-
-
-
-
 @app.route('/callback', methods=['POST'])
 def mpesa_callback():
     data = request.get_json()
@@ -461,7 +450,7 @@ def mpesa_callback():
     else:
         logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
         return jsonify({"ResultCode": 1, "ResultDesc": "Payment record not found"}), 404
-
+    
 
 # ... AddToCartResource, RemoveFromCartResource, ViewCartResource, and CheckoutResource classes ...
 #handles cart
@@ -574,7 +563,7 @@ class ViewCartResource(Resource):
 # api.add_resource(MpesaPaymentResource, '/mpesa_payment')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
-api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
+api.add_resource(ViewCartResource,'/view_cart/<int:user_id>')
 api.add_resource(CheckoutResource, '/checkout')
 
 
