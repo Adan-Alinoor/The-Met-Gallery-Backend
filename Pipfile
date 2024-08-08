@@ -4,8 +4,24 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+flask = "*"
+flask-sqlalchemy = "*"
+flask-jwt-extended = "*"
+flask-bcrypt = "*"
+flask-migrate = "*"
+flask-restful = "*"
+flask-cors = "*"
+sqlalchemy-serializer = "*"
+sqlalchemy = "*"
+python-dotenv = "*"
+faker = "*"
+requests = "*"
+flask-login = "*"
+bcrypt = "*"
+marshmallow = "*"
+dotenv = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.10"
+python_version = "3.8"
