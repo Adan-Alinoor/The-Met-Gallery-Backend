@@ -39,7 +39,7 @@ class Artwork(db.Model, SerializerMixin):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-class User(db.Model, SerializerMixin):
+class User(db.Model, SerializerMixin,UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, nullable=False, unique=True)

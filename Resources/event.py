@@ -16,23 +16,23 @@ event_parser.add_argument('location', type=str, required=True, help='Location is
 
 class EventsResource(Resource):
 
-    # Resource for managing events
+    
 
     def get(self, id=None):
-        # Get all events or a single event by ID
+       
         if id is None:
-            # Get all events
+            
             events = Events.query.all()
             return [event.to_dict() for event in events]
         else:
-            # Get a single event by id
+            
             event = Events.query.get(id)
             if event is None:
                 return {"error": "Event not found"}, 404
             return event.to_dict()
 
     def delete(self, id):
-        # Delete an event by ID
+       
         event = Events.query.get_or_404(id)
         if event is None:
             return {"error": "Event not found"}, 404
@@ -41,7 +41,7 @@ class EventsResource(Resource):
         return make_response(jsonify({'message': 'Event deleted'}), 200)
 
     def put(self, id):
-        # Update an event by ID
+        
         event = Events.query.get_or_404(id)
         if event is None:
             return {"error": "Event not found"}, 404
@@ -61,7 +61,7 @@ class EventsResource(Resource):
         return make_response(jsonify({'message': 'Event updated'}), 200)
 
     def post(self):
-        # Create a new event
+       
         args = event_parser.parse_args()
 
         try:

@@ -1,9 +1,12 @@
+
+
 from flask_restful import Resource, reqparse
 from datetime import datetime
-from models import db, Booking
+from models import db, Booking, User, Events, Ticket
 from flask import jsonify, make_response, request
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
-# Define the request parser for booking operations
+
 booking_parser = reqparse.RequestParser()
 booking_parser.add_argument('user_id', type=int, required=True, help='User ID is required')
 booking_parser.add_argument('event_id', type=int, required=True, help='Event ID is required')
@@ -11,22 +14,38 @@ booking_parser.add_argument('ticket_id', type=int, required=True, help='Ticket I
 booking_parser.add_argument('status', type=str, required=True, help='Status is required')
 
 class BookingResource(Resource):
+    @jwt_required()
     def get(self, id=None):
+        current_user = get_jwt_identity()
+
         if id is None:
-            # Retrieve all bookings
             bookings = Booking.query.all()
             return jsonify([booking.to_dict() for booking in bookings])
         else:
-            # Retrieve a specific booking by ID
+           
             booking = Booking.query.get(id)
             if booking is None:
                 return {"error": "Booking not found"}, 404
             return jsonify(booking.to_dict())
-        
+
+    @jwt_required()
     def post(self):
+        current_user = get_jwt_identity()  
         args = booking_parser.parse_args()
 
-        # Validate status (assuming status should be one of a predefined set of values)
+        user = User.query.get(args['user_id'])
+        if not user:
+            return {"error": "User not found"}, 404
+        
+        event = Events.query.get(args['event_id'])
+        if not event:
+            return {"error": "Event not found"}, 404
+
+        ticket = Ticket.query.get(args['ticket_id'])
+        if not ticket:
+            return {"error": "Ticket not found"}, 404
+
+        
         if args['status'] not in ['confirmed', 'pending', 'canceled']:
             return {"error": "Invalid status value"}, 400
 
@@ -41,14 +60,15 @@ class BookingResource(Resource):
         db.session.commit()
         return make_response(jsonify({'message': 'Booking created successfully'}), 201)
     
-    #To update the status of a booked event
+    @jwt_required()
     def patch(self, id):
+        current_user = get_jwt_identity()  
         args = request.get_json()
         booking = Booking.query.get(id)
-        
+
         if booking is None:
             return {"error": "Booking not found"}, 404
-        
+
         if 'status' in args:
             status = args['status']
             if status not in ['confirmed', 'pending', 'canceled']:
@@ -59,7 +79,9 @@ class BookingResource(Resource):
         
         return {"error": "Status not provided"}, 400
 
+    @jwt_required()
     def delete(self, id):
+        current_user = get_jwt_identity()  
         booking = Booking.query.get(id)
         if booking is None:
             return {"error": "Booking not found"}, 404
