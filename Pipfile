@@ -19,6 +19,7 @@ requests = "*"
 flask-login = "*"
 bcrypt = "*"
 marshmallow = "*"
+dotenv = "*"
 
 [dev-packages]
 

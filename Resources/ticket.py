@@ -8,7 +8,7 @@ from datetime import datetime
 from flask_jwt_extended import jwt_required
 import requests
 from dotenv import load_dotenv
-from flask import request, current_app
+from flask import request, current_app,make_response,jsonify
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -134,7 +134,7 @@ class CheckoutResource(Resource):
         payment = Payment(user_id=user.id, amount=amount, phone_number=phone_number)
         db.session.add(payment)
         db.session.commit()
-        
+
         # Call M-Pesa API to initiate payment
         access_token = get_mpesa_access_token()
         headers = {
@@ -156,51 +156,51 @@ class CheckoutResource(Resource):
             "TransactionDesc": "Payment for booking"
         }
 
-            try:
-                response = requests.post(
-                    "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                    headers=headers,
-                    json=payload
-                )
+        try:
+            response = requests.post(
+                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+                headers=headers,
+                json=payload
+            )
 
-                logging.debug(f'M-Pesa API Response: {response.text}')
-                response_data = response.json()
-            except requests.exceptions.RequestException as e:
-                logging.error(f'Error calling M-Pesa API: {e}')
-                payment.status = 'failed'
-                payment.result_desc = 'Failed to connect to M-Pesa API'
-                db.session.commit()
-                return {'error': 'Failed to connect to M-Pesa API'}, 500
-            except ValueError:
-                logging.error(f'Invalid JSON response: {response.text}')
-                payment.status = 'failed'
-                payment.result_desc = 'Invalid response from M-Pesa API'
-                db.session.commit()
-                return {'error': 'Invalid response from M-Pesa API'}, 500
+            logging.debug(f'M-Pesa API Response: {response.text}')
+            response_data = response.json()
+        except requests.exceptions.RequestException as e:
+            logging.error(f'Error calling M-Pesa API: {e}')
+            payment.status = 'failed'
+            payment.result_desc = 'Failed to connect to M-Pesa API'
+            db.session.commit()
+            return {'error': 'Failed to connect to M-Pesa API'}, 500
+        except ValueError:
+            logging.error(f'Invalid JSON response: {response.text}')
+            payment.status = 'failed'
+            payment.result_desc = 'Invalid response from M-Pesa API'
+            db.session.commit()
+            return {'error': 'Invalid response from M-Pesa API'}, 500
 
-            if response_data.get('ResponseCode') == '0':
-                payment.transaction_id = response_data['CheckoutRequestID']
-                payment.status = 'initiated'
-                db.session.commit()
+        if response_data.get('ResponseCode') == '0':
+            payment.transaction_id = response_data['CheckoutRequestID']
+            payment.status = 'initiated'
+            db.session.commit()
 
-                # Wait for payment status to be updated
-                while True:
-                    payment = Payment.query.filter_by(transaction_id=payment.transaction_id).first()
-                    if payment is None:
-                        logging.error(f'Payment record not found for transaction_id: {payment.transaction_id}')
-                        break
-                    if payment.status == 'completed':
-                        return {'message': 'Payment completed successfully'}, 201
-                    if payment.status == 'failed':
-                        break
-                    time.sleep(1)
+            # Wait for payment status to be updated
+            while True:
+                payment = Payment.query.filter_by(transaction_id=payment.transaction_id).first()
+                if payment is None:
+                    logging.error(f'Payment record not found for transaction_id: {payment.transaction_id}')
+                    break
+                if payment.status == 'completed':
+                    return {'message': 'Payment completed successfully'}, 201
+                if payment.status == 'failed':
+                    break
+                time.sleep(1)
 
-                return {'error': 'Payment failed'}, 400
-            else:
-                payment.status = 'failed'
-                payment.result_desc = response_data.get('ResponseDescription', 'Failed to initiate payment')
-                db.session.commit()
-                return {'error': 'Failed to initiate payment'}, 400
+            return {'error': 'Payment failed'}, 400
+        else:
+            payment.status = 'failed'
+            payment.result_desc = response_data.get('ResponseDescription', 'Failed to initiate payment')
+            db.session.commit()
+            return {'error': 'Failed to initiate payment'}, 400
 
     def post(self):
         """

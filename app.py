@@ -144,11 +144,6 @@ class AdminResource(Resource):
         return {'message': 'Admin content accessible'}
 
 
-api.add_resource(Signup, '/signup')
-api.add_resource(Login, '/login')
-api.add_resource(Logout, '/logout')
-api.add_resource(UserResource, '/user')
-api.add_resource(AdminResource, '/admin')
 
 
 
@@ -334,16 +329,7 @@ class Home(Resource):
 
 
 # Add the EventsResource class as a resource to the API
-api.add_resource(Home, '/')
 
-api.add_resource(EventsResource, '/events', '/events/<int:id>')
-api.add_resource(TicketResource, '/tickets')
-api.add_resource(MpesaCallbackResource, '/callback')
-api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
-api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
-
-api.add_resource(ArtworkListResource, '/artworks')
-api.add_resource(ArtworkResource, '/artworks/<int:id>')
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
