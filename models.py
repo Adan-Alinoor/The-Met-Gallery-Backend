@@ -155,27 +155,6 @@ class Ticket(db.Model, SerializerMixin):
     def __repr__(self):
         return f"Ticket('{self.event_id}', '{self.type_name}', '{self.price}', '{self.quantity}')"
 
-class Product(db.Model, SerializerMixin):
-    __tablename__ = 'products'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-
-    description = db.Column(db.String, nullable=False)
-    price = db.Column(db.Integer, nullable=False)
-    image = db.Column(db.String, nullable=False)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'name': self.name,
-            'description': self.description,
-            'price': self.price,
-            'image': self.image
-        }
-
-
-
 class Cart(db.Model, SerializerMixin):
     __tablename__ = 'carts'
     id = db.Column(db.Integer, primary_key=True)
@@ -208,13 +187,13 @@ class CartItem(db.Model, SerializerMixin):
         return {
             'id': self.id,
             'cart_id': self.cart_id,
-            'product_id': self.artwork_id,
+            'artwork_id': self.artwork_id,
             'quantity': self.quantity,
             'price': self.price,
             'title': self.title,
             'description': self.description,
             'image': self.image,
-            'product': self.artwork.to_dict()
+            'artwork': self.artwork.to_dict()
         }
 
 class Order(db.Model):
@@ -235,7 +214,7 @@ class OrderItem(db.Model):
     price = db.Column(db.Integer, nullable=False)
     
     order = db.relationship('Order', back_populates='items')
-    product = db.relationship('Product')
+    arwork = db.relationship('Artwork')
 
 
 class Payment(db.Model):
