@@ -1,4 +1,5 @@
 
+
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
@@ -6,6 +7,7 @@ from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork,
 import bcrypt
 import base64
 from datetime import datetime
+from datetime import timedelta
 import os
 from flask import Flask, request, jsonify
 import requests
@@ -31,7 +33,7 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CALLBACK_SECRET = 'your_secret_key_here'
-
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=30)
 
 migrate = Migrate(app, db)
 db.init_app(app) 
@@ -216,112 +218,6 @@ class ArtworkResource(Resource):
             return {"error": str(e)}, 500
 
 
-
-class AddToCartResource(Resource):
-    def post(self):
-        data = request.get_json()
-
-        # Find or create user (assuming a user is authenticated and user_id is available)
-        user_id = data.get('user_id')  # Adjust this line as per your authentication system
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
-
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        # Find or create cart for the user
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            cart = Cart(user_id=user.id)
-            db.session.add(cart)
-            db.session.commit()
-
-        # Check if artwork exists
-        artwork = Artwork.query.get(data['artwork_id'])
-        if not artwork:
-            return {'error': 'artwork not found'}, 404
-
-        # Get the quantity to add
-        quantity = data.get('quantity', 1)  # Default to 1 if quantity is not provided
-
-        # Check if the artwork is already in the cart
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-        if cart_item:
-            # Update the quantity if the artwork is already in the cart
-            cart_item.quantity += quantity  # Adjust quantity increment as needed
-        else:
-            # Add new CartItem if the artwork is not in the cart
-            cart_item = CartItem(
-                cart_id=cart.id,
-                artwork_id=artwork.id,
-                quantity=quantity, # Adjust quantity as needed
-                title = artwork.title,
-                description=artwork.description,
-                price=artwork.price,
-                image=artwork.image
-            )
-            db.session.add(cart_item)
-
-        db.session.commit()
-
-        return {'message': 'Artwork added to cart'}, 201
-
-
-class RemoveFromCartResource(Resource):
-    def post(self):
-        data = request.get_json()
-
-        # Find or create user (assuming a user is authenticated and user_id is available)
-        user_id = data.get('user_id')  # Adjust this line as per your authentication system
-        artwork_id = data.get('artwork_id')
-        if not user_id or not artwork_id:
-            return {'error': 'User ID and artwork ID are required'}, 400
-
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        # Find the user's cart
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            return {'error': 'Cart not found'}, 404
-
-        # Find the CartItem to be removed
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-        if not cart_item:
-            return {'error': 'Artwork not found in cart'}, 404
-
-        # Decrement the quantity or remove the CartItem
-        if cart_item.quantity > 1:
-            cart_item.quantity -= 1
-        else:
-            db.session.delete(cart_item)
-
-        db.session.commit()
-
-        return {'message': 'Artwork removed from cart'}, 200
-
-
-class ViewCartResource(Resource):
-    def get(self, user_id):
-        # Find the user's cart
-        cart = Cart.query.filter_by(user_id=user_id).first()
-        if not cart:
-            return {"error": "Cart not found"}, 404
-
-        # Fetch all cart items
-        cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-        if not cart_items:
-            return {"message": "Cart is empty"}, 200
-
-        # Convert cart items to dictionary format
-        cart_items_list = [item.to_dict() for item in cart_items]
-        return {'items': cart_items_list}, 200
-
-
-
-
 class Home(Resource):
     def get(self):
         response_dict = {"message": "Welcome to The Met Gallery"}
@@ -444,14 +340,28 @@ def create_payment(payment_data):
 
 
 
-class CheckoutResource(Resource):
+class ArtworkCheckoutResource(Resource):
     @staticmethod
     def initiate_mpesa_payment(payment_data):
+        # Check if payment_data is a dictionary
+        if not isinstance(payment_data, dict):
+            logging.error(f'Expected a dictionary but got: {type(payment_data)}')
+            return {'error': 'Invalid payment data format'}, 400
+
+        logging.debug(f'Payment data: {payment_data}')
+        
+        # Extract fields from payment_data
         user_id = payment_data.get('user_id')
         order_id = payment_data.get('order_id')
         phone_number = payment_data.get('phone_number')
         amount = payment_data.get('amount')
+        
+        # Validate required fields
+        if not all([user_id, order_id, phone_number, amount]):
+            logging.error('Missing required fields in payment data')
+            return {'error': 'Missing required fields'}, 400
 
+        # Fetch user and order from the database
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
@@ -513,19 +423,23 @@ class CheckoutResource(Resource):
                 return {'message': 'Payment initiated successfully', 'transaction_desc': payment.transaction_desc}, 201
             else:
                 payment.status = 'failed'
+                payment.transaction_desc = response_data.get('Description', 'Payment failed')
                 db.session.commit()
                 return {'error': 'Failed to initiate payment'}, 400
 
         except requests.exceptions.RequestException as e:
             logging.error(f'Error calling M-Pesa API: {e}')
             payment.status = 'failed'
+            payment.transaction_desc = 'Failed to connect to M-Pesa API'
             db.session.commit()
             return {'error': 'Failed to connect to M-Pesa API'}, 500
         except ValueError:
             logging.error(f'Invalid JSON response: {response.text}')
             payment.status = 'failed'
+            payment.transaction_desc = 'Invalid response from M-Pesa API'
             db.session.commit()
             return {'error': 'Invalid response from M-Pesa API'}, 500
+
 
     @jwt_required()
     def post(self):
@@ -729,17 +643,12 @@ class ShippingResource(Resource):
         return {'message': 'Shipping address updated successfully', 'address': shipping_address.to_dict()}, 200
 
 
-
 class AddToCartResource(Resource):
-    @user_required 
     def post(self):
         data = request.get_json()
 
-
-    def post(self):
-        data = request.get_json()
-
-        user_id = data.get('user_id')
+        # Find or create user (assuming a user is authenticated and user_id is available)
+        user_id = data.get('user_id')  # Adjust this line as per your authentication system
         if not user_id:
             return {'error': 'User ID is required'}, 400
 
@@ -747,64 +656,117 @@ class AddToCartResource(Resource):
         if not user:
             return {'error': 'User not found'}, 404
 
-
+        # Find or create cart for the user
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             cart = Cart(user_id=user.id)
             db.session.add(cart)
             db.session.commit()
 
+        # Check if artwork exists
         artwork = Artwork.query.get(data['artwork_id'])
         if not artwork:
-            return {'error': 'Artwork not found'}, 404
+            return {'error': 'artwork not found'}, 404
 
-        quantity = data.get('quantity', 1)
-
+        
+        quantity = data.get('quantity', 1)  
+        
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
         if cart_item:
-            cart_item.quantity += quantity
+            # Update the quantity if the artwork is already in the cart
+            cart_item.quantity += quantity  # Adjust quantity increment as needed
         else:
+            # Add new CartItem if the artwork is not in the cart
             cart_item = CartItem(
                 cart_id=cart.id,
                 artwork_id=artwork.id,
-                quantity=quantity,
-                title=artwork.title,
+                quantity=quantity, # Adjust quantity as needed
+                title = artwork.title,
                 description=artwork.description,
                 price=artwork.price,
                 image=artwork.image
             )
             db.session.add(cart_item)
 
-        address = data.get('address')
-        city = data.get('city')
-        country = data.get('country')
-        phone = data.get('phone')
-        full_name = data.get('full_name')
-        email = data.get('email')
-
-        if not all([address, city, country, phone, full_name, email]):
-            return {'error': 'All fields are required'}, 400
-
-        # Check if a shipping address already exists for the user
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if shipping_address:
-            return {'error': 'Shipping address already exists for this user'}, 400
-
-        new_address = ShippingAddress(
-            user_id=user_id,
-            address=address,
-            city=city,
-            country=country,
-            phone=phone,
-            full_name=full_name,
-            email=email
-        )
-
-
-        db.session.add(new_address)
         db.session.commit()
 
-        return {'message': 'Shipping address created successfully', 'address': new_address.to_dict()}, 201
+        return {'message': 'Artwork added to cart'}, 201
+
+# class AddToCartResource(Resource):
+#     @user_required 
+#     def post(self):
+#         data = request.get_json()
+
+
+#     def post(self):
+#         data = request.get_json()
+
+#         user_id = data.get('user_id')
+#         if not user_id:
+#             return {'error': 'User ID is required'}, 400
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             cart = Cart(user_id=user.id)
+#             db.session.add(cart)
+#             db.session.commit()
+
+#         artwork = Artwork.query.get(data['artwork_id'])
+#         if not artwork:
+#             return {'error': 'Artwork not found'}, 404
+
+#         quantity = data.get('quantity', 1)
+
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+#         if cart_item:
+#             cart_item.quantity += quantity
+#         else:
+#             cart_item = CartItem(
+#                 cart_id=cart.id,
+#                 artwork_id=artwork.id,
+#                 quantity=quantity,
+#                 title=artwork.title,
+#                 description=artwork.description,
+#                 price=artwork.price,
+#                 image=artwork.image
+#             )
+#             db.session.add(cart_item)
+
+#         address = data.get('address')
+#         city = data.get('city')
+#         country = data.get('country')
+#         phone = data.get('phone')
+#         full_name = data.get('full_name')
+#         email = data.get('email')
+
+#         if not all([address, city, country, phone, full_name, email]):
+#             return {'error': 'All fields are required'}, 400
+
+#         # Check if a shipping address already exists for the user
+#         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
+#         if shipping_address:
+#             return {'error': 'Shipping address already exists for this user'}, 400
+
+#         new_address = ShippingAddress(
+#             user_id=user_id,
+#             address=address,
+#             city=city,
+#             country=country,
+#             phone=phone,
+#             full_name=full_name,
+#             email=email
+#         )
+
+
+#         db.session.add(new_address)
+#         db.session.commit()
+
+#         return {'message': 'Shipping address created successfully', 'address': new_address.to_dict()}, 201
 
 
 class RemoveFromCartResource(Resource):
@@ -860,7 +822,7 @@ from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.ticket import TicketResource
 from Resources.ticket import MpesaCallbackResource
-from Resources.ticket import CheckoutResource
+from Resources.ticket import EventCheckoutResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
     
@@ -880,15 +842,16 @@ api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
 
-api.add_resource(ViewCartResource,'/view_cart/<int:user_id>')
-api.add_resource(CheckoutResource, '/checkout')
+# api.add_resource(ViewCartResource,'/view_cart/<int:user_id>')
+api.add_resource(EventCheckoutResource, '/eventcheckout')
+api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
-api.add_resource(AddToCartResource, '/cart/add')
-api.add_resource(RemoveFromCartResource, '/cart/remove')
-api.add_resource(ViewCartResource, '/cart/<int:user_id>')
+# api.add_resource(AddToCartResource, '/cart/add')
+# api.add_resource(RemoveFromCartResource, '/cart/remove')
+# api.add_resource(ViewCartResource, '/cart/<int:user_id>')
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -898,7 +861,9 @@ logging.basicConfig(level=logging.DEBUG)
 api.add_resource(Home, '/')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,port=5555)
+
+
 
 
 
