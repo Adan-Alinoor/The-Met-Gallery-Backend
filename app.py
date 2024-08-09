@@ -407,7 +407,7 @@ def create_payment(payment_data):
         "PartyA": payment_data['phone_number'],
         "PartyB": SHORTCODE,
         "PhoneNumber": payment_data['phone_number'],
-        "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  
+        "CallBackURL": "https://5769-102-214-74-3.ngrok-free.app/callback",  
         "AccountReference": f"Order{payment_data.get('order_id')}",
         "TransactionDesc": "Payment for order"
     }
@@ -449,10 +449,10 @@ class ArtworkCheckoutResource(Resource):
         logging.debug(f'Payment data: {payment_data}')
         
         # Extract fields from payment_data
-        user_id = payment_data.get('user_id')
-        order_id = payment_data.get('order_id')
-        phone_number = payment_data.get('phone_number')
-        amount = payment_data.get('amount')
+        user_id = payment_data['user_id']
+        order_id = payment_data['order_id']
+        phone_number = payment_data['phone_number']
+        amount = payment_data['amount']
         
         # Validate required fields
         if not all([user_id, order_id, phone_number, amount]):
@@ -1032,6 +1032,7 @@ api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
+api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')

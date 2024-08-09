@@ -130,7 +130,9 @@ class CartItem(db.Model, SerializerMixin):
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)  # Keeping price as integer
-
+    description = db.Column(db.String, nullable=False)
+    image = db.Column(db.String, nullable=False)
+    title = db.Column(db.String, nullable=False)
     cart = db.relationship('Cart', back_populates='items')
     artwork = db.relationship('Artwork')
 
