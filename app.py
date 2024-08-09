@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Booking
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Events, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime
@@ -891,6 +891,54 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     print('Client disconnected')
+    
+@app.route('/dashboard', methods=['GET'])
+@jwt_required()
+def get_dashboard_overview():
+    current_user_id = get_jwt_identity()
+
+    bookings = Booking.query.filter_by(user_id=current_user_id).all()
+    notifications = Notification.query.filter_by(user_id=current_user_id).all()
+    user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
+    events = Events.query.all() 
+
+    booking_data = [{
+        'id': booking.id,
+        'user_id': booking.user_id,
+        'event_id': booking.event_id,
+        'booking_date': booking.created_at.isoformat()
+    } for booking in bookings]
+
+    notification_data = [{
+        'id': notification.id,
+        'user_id': notification.user_id,
+        'message': notification.message,
+        'timestamp': notification.timestamp.isoformat()
+    } for notification in notifications]
+
+    event_data = [{
+        'id': event.id,
+        'title': event.title,
+        'description': event.description,
+        'start_date': event.start_date.isoformat(),
+        'end_date': event.end_date.isoformat()
+    } for event in events]
+
+    user_activity_data = [{
+        'id': activity.id,
+        'user_id': activity.user_id,
+        'activity_type': activity.activity_type,
+        'timestamp': activity.timestamp.isoformat()
+    } for activity in user_activities]
+
+    response = {
+        'bookings': booking_data,
+        'notifications': notification_data,
+        'events': event_data,
+        'user_activities': user_activity_data
+    }
+
+    return jsonify(response)
     
 
 
