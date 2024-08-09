@@ -492,7 +492,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://b150-102-214-74-3.ngrok-free.app/callback",  
+            "CallBackURL": "https://0c8e-102-214-74-3.ngrok-free.app/callback",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -960,5 +960,5 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, port=5555)
 
