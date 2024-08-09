@@ -15,17 +15,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import db, Ticket, Booking, User, Payment
 
-# Load environment variables from .env file
 load_dotenv()
 
-# M-Pesa API credentials
 CONSUMER_KEY = os.getenv('CONSUMER_KEY')
 CONSUMER_SECRET = os.getenv('CONSUMER_SECRET')
 SHORTCODE = os.getenv('SHORTCODE')
 LIPA_NA_MPESA_ONLINE_PASSKEY = os.getenv('LIPA_NA_MPESA_ONLINE_PASSKEY')
 PHONE_NUMBER = os.getenv('PHONE_NUMBER')
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
 def get_mpesa_access_token():
@@ -130,12 +127,11 @@ class EventCheckoutResource(Resource):
         if not booking:
             return {'error': 'Booking not found'}, 404
 
-        # Create a new Payment record
         payment = Payment(user_id=user.id, amount=amount, phone_number=phone_number)
         db.session.add(payment)
         db.session.commit()
 
-        # Call M-Pesa API to initiate payment
+
         access_token = get_mpesa_access_token()
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -183,7 +179,6 @@ class EventCheckoutResource(Resource):
             payment.status = 'initiated'
             db.session.commit()
 
-            # Wait for payment status to be updated
             while True:
                 payment = Payment.query.filter_by(transaction_id=payment.transaction_id).first()
                 if payment is None:
@@ -212,37 +207,37 @@ class EventCheckoutResource(Resource):
         quantity = args['quantity']
         phone_number = args['phone_number']
 
-        # Validate input fields
+       
         if not all([user_id, ticket_type, quantity, phone_number]):
             return {'error': 'All fields are required'}, 400
 
-        # Get user from database
+        
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
 
-        # Validate phone number format
+       
         if not phone_number.startswith("2547") or len(phone_number) != 12:
             return {"error": "Invalid phone number"}, 400
 
-        # Find the ticket type in the database
+       
         ticket = Ticket.query.filter_by(type_name=ticket_type).first()
         if not ticket:
             return {'error': 'Invalid ticket type'}, 400
 
-        # Check if there are enough tickets available
+       
         if ticket.quantity < quantity:
             return {'error': 'Not enough tickets available'}, 400
 
-        # Calculate the total amount to be paid
+        
         amount = ticket.price * quantity
 
-        # Decrease the ticket quantity
+        
         ticket.quantity -= quantity
         db.session.commit()
 
         try:
-            # Create a new Booking record
+            
             booking = Booking(user_id=user_id, event_id=ticket.event_id, ticket_id=ticket.id, status='pending')
             db.session.add(booking)
             db.session.commit()
@@ -254,7 +249,6 @@ class EventCheckoutResource(Resource):
                 'amount': amount
             }
 
-            # Create a new Payment record
             payment = Payment(
                 user_id=user_id,
                 booking_id=booking.id,
@@ -266,7 +260,7 @@ class EventCheckoutResource(Resource):
             db.session.add(payment)
             db.session.commit()
 
-            # Create a new thread to initiate the payment process
+            
             app = current_app._get_current_object()
             thread = threading.Thread(target=self.initiate_payment, args=(app, payment_data, payment))
             thread.start()
@@ -276,7 +270,7 @@ class EventCheckoutResource(Resource):
                 'booking_id': booking.id
             }, 201
         except SQLAlchemyError as e:
-            db.session.rollback()  # Rollback changes if there's a database error
+            db.session.rollback()  
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
         
@@ -321,7 +315,7 @@ class MpesaCallbackResource(Resource):
             logging.error(f'Payment record not found for CheckoutRequestID: {checkout_request_id}')
             return {"ResultCode": 1, "ResultDesc": "Payment record not found"}, 404
 
-# Define the request parser for ticket buying operations
+
 ticket_parser = reqparse.RequestParser()
 ticket_parser.add_argument('user_id', type=int, required=True, help='User ID is required')
 ticket_parser.add_argument('ticket_type', type=str, required=True, help='Ticket type is required')
@@ -347,30 +341,28 @@ class TicketResource(Resource):
         quantity = args['quantity']
         phone_number = args['phone_number']
 
-        # Validate phone number format
         if not phone_number.startswith("2547") or len(phone_number) != 12:
             return {"error": "Invalid phone number"}, 400
 
-        # Find the ticket type in the database
+
         ticket = Ticket.query.filter_by(type_name=ticket_type).first()
 
         if not ticket:
             return make_response(jsonify({'message': 'Invalid ticket type'}), 400)
 
-        # Check if there are enough tickets available
+
         if ticket.quantity < quantity:
             return make_response(jsonify({'message': 'Not enough tickets available'}), 400)
 
-        # Calculate the total amount to be paid
+       
         amount = ticket.price * quantity
 
-        # Create a new Booking record
-        user_id = 1  # Replace with actual user ID (e.g., from session or login) after authentication
+
+        user_id = 1 
         booking = Booking(user_id=user_id, event_id=ticket.event_id, ticket_id=ticket.id, status='pending')
         db.session.add(booking)
         db.session.commit()
 
-        # Initiate payment through M-Pesa
         payment_data = {
             'user_id': user_id,
             'booking_id': booking.id,
@@ -378,7 +370,6 @@ class TicketResource(Resource):
             'amount': amount
         }
 
-        # Create an instance of EventCheckoutResource
         checkout_resource = EventCheckoutResource()
         payment_response = checkout_resource.initiate_mpesa_payment(payment_data)
 

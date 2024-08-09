@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from app import app, db
-from models import Events, User, Booking, Ticket, Payment, Artwork,OrderItem,Order,Cart,CartItem,ShippingAddress
+from models import Event, User, Booking, Ticket, Payment, Artwork,OrderItem,Order,Cart,CartItem,ShippingAddress
 from faker import Faker
 import logging
 
@@ -33,7 +33,7 @@ def delete_existing_data():
             Ticket.query.delete()
 
             logging.info("Deleting data from Events...")
-            Events.query.delete()
+            Event.query.delete()
 
             logging.info("Deleting data from CartItems...")
             CartItem.query.delete()
@@ -141,7 +141,7 @@ def seed_events():
                 end_date = datetime.strptime(event_data["end_date"], "%d-%m-%Y").date()
                 event_time = datetime.strptime(event_data["time"], "%H:%M:%S").time()
 
-                event = Events(
+                event = Event(
                     title=event_data["title"],
                     image_url=event_data["image_url"],
                     description=event_data["description"],

@@ -1,11 +1,10 @@
-
 from flask_restful import Resource, reqparse
 from flask import jsonify, request, make_response
 from datetime import datetime
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Events
+from models import db, Event
 
-# Define a request parser for event data
+
 event_parser = reqparse.RequestParser()
 event_parser.add_argument('title', type=str, required=True, help='Title is required')
 event_parser.add_argument('image_url', type=str, required=True, help='Image is required')
@@ -16,42 +15,40 @@ event_parser.add_argument('time', type=str, required=True, help='Time is require
 event_parser.add_argument('location', type=str, required=True, help='Location is required')
 
 class EventsResource(Resource):
-    # Resource for managing events
+  
 
-    @jwt_required()  # Requires authentication
+    @jwt_required() 
     def get(self, id=None):
-        # Get all events or a single event by ID
+       
         if id is None:
-            # Get all events
-            events = Events.query.all()
+            
+            events = Event.query.all()
             return [event.to_dict() for event in events]
         else:
-            # Get a single event by id
-            event = Events.query.get(id)
+            
+            event = Event.query.get(id)
             if event is None:
                 return {"error": "Event not found"}, 404
             return event.to_dict()
 
-    @jwt_required()  # Requires authentication
+    @jwt_required()  
     def delete(self, id):
         current_user_id = get_jwt_identity()
 
-        # Delete an event by ID (no need to check for admin for deletion if it's not required)
-        event = Events.query.get_or_404(id)
+       
+        event = Event.query.get_or_404(id)
         db.session.delete(event)
         db.session.commit()
         return make_response(jsonify({'message': 'Event deleted'}), 200)
 
-    @jwt_required()  # Requires authentication
+    @jwt_required()  
     def put(self, id):
         current_user_id = get_jwt_identity()
 
-        # Update an event by ID (no need to check for admin for updating if it's not required)
-        event = Events.query.get_or_404(id)
+        event = Event.query.get_or_404(id)
     
         args = event_parser.parse_args()
 
-        # Validate date and time formats
         try:
             event.start_date = datetime.strptime(args['start_date'], '%d-%m-%Y').date()
             event.end_date = datetime.strptime(args['end_date'], '%d-%m-%Y').date()
@@ -62,19 +59,19 @@ class EventsResource(Resource):
         event.title = args['title']
         event.image_url = args['image_url']
         event.description = args['description']
-        event.user_id = current_user_id  # Associate the event with the current user
+        event.user_id = current_user_id  
         event.location = args['location']
     
         db.session.commit()
         return make_response(jsonify({'message': 'Event updated'}), 200)
 
-    @jwt_required()  # Requires authentication
+    @jwt_required()  
     def post(self):
-        current_user_id = get_jwt_identity()  # Get the current user's identity
+        current_user_id = get_jwt_identity()  
 
         args = event_parser.parse_args()
 
-        # Validate date and time formats
+       
         try:
             start_date = datetime.strptime(args['start_date'], '%d-%m-%Y').date()
             end_date = datetime.strptime(args['end_date'], '%d-%m-%Y').date()
@@ -83,13 +80,13 @@ class EventsResource(Resource):
             return {"error": str(e)}, 400
 
         try:
-            new_event = Events(
+            new_event = Event(
                 title=args['title'],
                 image_url=args['image_url'],
                 description=args['description'],
                 start_date=start_date,
                 end_date=end_date,
-                user_id=current_user_id,  # Associate the event with the current user
+                user_id=current_user_id,  
                 time=event_time,
                 created_at=datetime.now(),
                 location=args['location']

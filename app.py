@@ -1,9 +1,7 @@
-
-
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime
@@ -26,14 +24,17 @@ from Resources.ticket import MpesaCallbackResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 
+from flask_socketio import SocketIO, send, emit
+
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///MetGallery.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CALLBACK_SECRET = 'your_secret_key_here'
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=30)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 
 migrate = Migrate(app, db)
 db.init_app(app) 
@@ -71,11 +72,13 @@ class Login(Resource):
         
         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             access_token = create_access_token(identity=user.id)
-            return jsonify({
+            response = {
                 'message': f"{user.role.capitalize()} logged in successfully",
                 'access_token': access_token,
-                'role': user.role  # Include the user's role in the response
-            })
+                'role': user.role  
+            }
+            print("Response Data:", response)  # Debugging line
+            return jsonify(response)
         
         return jsonify({'message': 'Invalid email or password'}), 401
 
@@ -148,9 +151,6 @@ class AdminResource(Resource):
 
 
 
-
-
-
 class ArtworkListResource(Resource):
     @user_required
     def get(self):
@@ -160,7 +160,7 @@ class ArtworkListResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-    @user_required  # Only authenticated users can post artwork
+    @user_required  
     def post(self):
         data = request.get_json()
         if not data:
@@ -207,7 +207,7 @@ class ArtworkResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-    @user_required  # Allow any authenticated user to delete artwork
+    @user_required  
     def delete(self, id):
         try:
             artwork = Artwork.query.get_or_404(id)
@@ -218,13 +218,111 @@ class ArtworkResource(Resource):
             return {"error": str(e)}, 500
 
 
+
+class AddToCartResource(Resource):
+    def post(self):
+        data = request.get_json()
+
+        user_id = data.get('user_id')  
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        cart = Cart.query.filter_by(user_id=user.id).first()
+        if not cart:
+            cart = Cart(user_id=user.id)
+            db.session.add(cart)
+            db.session.commit()
+
+
+        artwork = Artwork.query.get(data['artwork_id'])
+        if not artwork:
+            return {'error': 'artwork not found'}, 404
+
+        
+        quantity = data.get('quantity', 1)  
+        
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+        if cart_item:
+            
+            cart_item.quantity += quantity  
+        else:
+            
+            cart_item = CartItem(
+                cart_id=cart.id,
+                artwork_id=artwork.id,
+                quantity=quantity, 
+                title = artwork.title,
+                description=artwork.description,
+                price=artwork.price,
+                image=artwork.image
+            )
+            db.session.add(cart_item)
+
+        db.session.commit()
+
+        return {'message': 'Artwork added to cart'}, 201
+
+
+class RemoveFromCartResource(Resource):
+    def post(self):
+        data = request.get_json()
+
+        user_id = data.get('user_id')  
+        artwork_id = data.get('artwork_id')
+        if not user_id or not artwork_id:
+            return {'error': 'User ID and artwork ID are required'}, 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        cart = Cart.query.filter_by(user_id=user.id).first()
+        if not cart:
+            return {'error': 'Cart not found'}, 404
+
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+        if not cart_item:
+            return {'error': 'Artwork not found in cart'}, 404
+
+       
+        if cart_item.quantity > 1:
+            cart_item.quantity -= 1
+        else:
+            db.session.delete(cart_item)
+
+        db.session.commit()
+
+        return {'message': 'Artwork removed from cart'}, 200
+
+
+class ViewCartResource(Resource):
+    def get(self, user_id):
+       
+        cart = Cart.query.filter_by(user_id=user_id).first()
+        if not cart:
+            return {"error": "Cart not found"}, 404
+
+        
+        cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+        if not cart_items:
+            return {"message": "Cart is empty"}, 200
+
+        
+        cart_items_list = [item.to_dict() for item in cart_items]
+        return {'items': cart_items_list}, 200
+
+
+
+
 class Home(Resource):
     def get(self):
         response_dict = {"message": "Welcome to The Met Gallery"}
         return jsonify(response_dict)
 
-
-# Add the EventsResource class as a resource to the API
 
 
 # Configure logging
@@ -293,7 +391,7 @@ def create_payment(payment_data):
     db.session.add(payment)
     db.session.commit()
 
-    # Call M-Pesa API to initiate payment
+
     access_token = get_mpesa_access_token()
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -309,7 +407,7 @@ def create_payment(payment_data):
         "PartyA": payment_data['phone_number'],
         "PartyB": SHORTCODE,
         "PhoneNumber": payment_data['phone_number'],
-        "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  # Replace with your callback URL
+        "CallBackURL": "https://b0ca-102-214-74-3.ngrok-free.app/callback",  
         "AccountReference": f"Order{payment_data.get('order_id')}",
         "TransactionDesc": "Payment for order"
     }
@@ -370,13 +468,13 @@ class ArtworkCheckoutResource(Resource):
         if not order:
             return {'error': 'Order not found'}, 404
 
-        # Create a new Payment record
+
         payment = Payment(
             user_id=user.id,
             order_id=order.id,
             amount=amount,
             phone_number=phone_number,
-            transaction_id=None,  # Placeholder for the transaction ID
+            transaction_id=None, 
             status='pending',
             created_at=datetime.now(),
             updated_at=datetime.now()
@@ -384,7 +482,7 @@ class ArtworkCheckoutResource(Resource):
         db.session.add(payment)
         db.session.commit()
 
-        # Call M-Pesa API to initiate payment
+        
         access_token = get_mpesa_access_token()
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -400,7 +498,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://your-callback-url/callback",  # Replace with your callback URL
+            "CallBackURL": "https://your-callback-url/callback",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -461,7 +559,7 @@ class ArtworkCheckoutResource(Resource):
             if not user:
                 return {'error': 'User not found'}, 404
 
-            # Check if shipping address exists for the user
+
             shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
             if not shipping_address:
                 return {'error': 'Shipping address is required'}, 400
@@ -495,7 +593,7 @@ class ArtworkCheckoutResource(Resource):
                 else:
                     db.session.delete(cart_item)
 
-            db.session.commit()  # Commit the order and order items
+            db.session.commit()  
 
             payment_data = {
                 'user_id': user.id,
@@ -539,13 +637,11 @@ def mpesa_callback():
         logging.error("No data received in callback")
         return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
     
-    # Validate secret key (example)
     secret_key = request.headers.get('X-Callback-Secret')
     if secret_key != CALLBACK_SECRET:
         logging.error("Invalid callback secret")
         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
 
-    # Process the callback data and update payment status
     try:
         stk_callback = data['Body']['stkCallback']
         checkout_request_id = stk_callback['CheckoutRequestID']
@@ -559,8 +655,6 @@ def mpesa_callback():
     logging.debug(f'CheckoutRequestID: {checkout_request_id}')
     logging.debug(f'ResultCode: {result_code}')
     logging.debug(f'ResultDesc: {result_desc}')
-
-    # Find the corresponding payment record
 
     payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
 
@@ -582,7 +676,7 @@ def mpesa_callback():
 class ShippingResource(Resource):
     @user_required
     def get(self, user_id):
-        # Fetch the shipping address for the user
+      
         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
         if not shipping_address:
             return {"error": "Shipping address not found"}, 404
@@ -604,7 +698,7 @@ class ShippingResource(Resource):
         if not all([user_id, address, city, country, phone, full_name, email]):
             return {'error': 'All fields are required'}, 400
 
-        # Check if a shipping address already exists for the user
+       
         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
         if shipping_address:
             return {'error': 'Shipping address already exists for this user'}, 400
@@ -747,10 +841,10 @@ class AddToCartResource(Resource):
 #         if not all([address, city, country, phone, full_name, email]):
 #             return {'error': 'All fields are required'}, 400
 
-#         # Check if a shipping address already exists for the user
-#         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-#         if shipping_address:
-#             return {'error': 'Shipping address already exists for this user'}, 400
+
+        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
+        if shipping_address:
+            return {'error': 'Shipping address already exists for this user'}, 400
 
 #         new_address = ShippingAddress(
 #             user_id=user_id,
@@ -770,7 +864,7 @@ class AddToCartResource(Resource):
 
 
 class RemoveFromCartResource(Resource):
-    @user_required  # Ensure the user is authenticated
+    @user_required  
     def post(self):
         data = request.get_json()
 
@@ -790,7 +884,7 @@ class RemoveFromCartResource(Resource):
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
             return {'error': 'Artwork not found in cart'}, 404
-            return {'error': 'Artwork not found in cart'}, 404
+           
 
         if cart_item.quantity > 1:
             cart_item.quantity -= 1
@@ -815,6 +909,105 @@ class ViewCartResource(Resource):
         cart_items_list = [item.to_dict() for item in cart_items]
 
         return {'items': cart_items_list}, 200
+      
+@app.route('/messages', methods=['POST'])
+@jwt_required()
+def send_message():
+    data = request.json
+    recipient_id = data.get('recipient_id')
+    message_text = data.get('message')
+    sender_id = get_jwt_identity()
+
+    if not recipient_id or not message_text:
+        return jsonify({"error": "Invalid data"}), 400
+
+    new_message = Message(sender=sender_id, recipient=recipient_id, message=message_text)
+    db.session.add(new_message)
+    db.session.commit()
+
+    socketio.emit('new_message', {
+        'sender': sender_id,
+        'recipient': recipient_id,
+        'message': message_text,
+        'timestamp': new_message.timestamp.isoformat()
+    }, broadcast=True)
+
+    return jsonify({"message": "Message sent"}), 201
+
+@app.route('/messages', methods=['GET'])
+@jwt_required()
+def get_messages():
+    user_id = get_jwt_identity()
+    messages = Message.query.filter((Message.sender == user_id) | (Message.recipient == user_id)).all()
+    
+    return jsonify([{
+        'id': msg.id,
+        'sender': msg.sender,
+        'recipient': msg.recipient,
+        'message': msg.message,
+        'timestamp': msg.timestamp.isoformat()
+    } for msg in messages])
+    
+@socketio.on('message')
+def handle_message(msg):
+    print('Message: ' + msg)
+    send(msg, broadcast=True)
+
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+    
+@app.route('/dashboard', methods=['GET'])
+@jwt_required()
+def get_dashboard_overview():
+    current_user_id = get_jwt_identity()
+
+    bookings = Booking.query.filter_by(user_id=current_user_id).all()
+    notifications = Notification.query.filter_by(user_id=current_user_id).all()
+    user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
+    events = Event.query.all() 
+
+    booking_data = [{
+        'id': booking.id,
+        'user_id': booking.user_id,
+        'event_id': booking.event_id,
+        'booking_date': booking.created_at.isoformat()
+    } for booking in bookings]
+
+    notification_data = [{
+        'id': notification.id,
+        'user_id': notification.user_id,
+        'message': notification.message,
+        'timestamp': notification.timestamp.isoformat()
+    } for notification in notifications]
+
+    event_data = [{
+        'id': event.id,
+        'title': event.title,
+        'description': event.description,
+        'start_date': event.start_date.isoformat(),
+        'end_date': event.end_date.isoformat()
+    } for event in events]
+
+    user_activity_data = [{
+        'id': activity.id,
+        'user_id': activity.user_id,
+        'activity_type': activity.activity_type,
+        'timestamp': activity.timestamp.isoformat()
+    } for activity in user_activities]
+
+    response = {
+        'bookings': booking_data,
+        'notifications': notification_data,
+        'events': event_data,
+        'user_activities': user_activity_data
+    }
+
+    return jsonify(response)
     
 
 
@@ -834,36 +1027,22 @@ api.add_resource(AdminResource, '/admin')
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
-
-
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
-
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
-
-# api.add_resource(ViewCartResource,'/view_cart/<int:user_id>')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
-api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
-# api.add_resource(AddToCartResource, '/cart/add')
-# api.add_resource(RemoveFromCartResource, '/cart/remove')
-# api.add_resource(ViewCartResource, '/cart/<int:user_id>')
 
-# Configure logging
+
+api.add_resource(Home, '/')
+
 logging.basicConfig(level=logging.DEBUG)
 
 
-# Ensure no duplicate resources are added
-api.add_resource(Home, '/')
 
 if __name__ == '__main__':
-    app.run(debug=True,port=5555)
-
-
-
-
-
+    socketio.run(app, debug=True, port=5555)
