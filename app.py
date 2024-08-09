@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Events, UserActivity
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Events, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime
