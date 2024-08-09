@@ -4,8 +4,8 @@ from flask_migrate import Migrate
 from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
 import bcrypt
 import base64
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime,timedelta
+
 import os
 from flask import Flask, request, jsonify
 import requests
@@ -34,6 +34,7 @@ app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 CALLBACK_SECRET = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
+
 
 
 migrate = Migrate(app, db)
@@ -77,7 +78,7 @@ class Login(Resource):
                 'access_token': access_token,
                 'role': user.role  
             }
-            print("Response Data:", response)  # Debugging line
+            print("Response Data:", response) 
             return jsonify(response)
         
         return jsonify({'message': 'Invalid email or password'}), 401
@@ -324,8 +325,6 @@ class Home(Resource):
         return jsonify(response_dict)
 
 
-
-# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -435,31 +434,28 @@ def create_payment(payment_data):
         return {'message': 'Payment initiated successfully'}, 201
     else:
         return {'error': 'Failed to initiate payment'}, 400
-
-
-
 class ArtworkCheckoutResource(Resource):
     @staticmethod
     def initiate_mpesa_payment(payment_data):
-        # Check if payment_data is a dictionary
+        
         if not isinstance(payment_data, dict):
             logging.error(f'Expected a dictionary but got: {type(payment_data)}')
             return {'error': 'Invalid payment data format'}, 400
 
         logging.debug(f'Payment data: {payment_data}')
         
-        # Extract fields from payment_data
-        user_id = payment_data['user_id']
-        order_id = payment_data['order_id']
-        phone_number = payment_data['phone_number']
-        amount = payment_data['amount']
+      
+        user_id = payment_data.get('user_id')
+        order_id = payment_data.get('order_id')
+        phone_number = payment_data.get('phone_number')
+        amount = payment_data.get('amount')
         
-        # Validate required fields
+      
         if not all([user_id, order_id, phone_number, amount]):
             logging.error('Missing required fields in payment data')
             return {'error': 'Missing required fields'}, 400
 
-        # Fetch user and order from the database
+
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
@@ -467,7 +463,6 @@ class ArtworkCheckoutResource(Resource):
         order = Order.query.get(order_id)
         if not order:
             return {'error': 'Order not found'}, 404
-
 
         payment = Payment(
             user_id=user.id,
@@ -482,7 +477,6 @@ class ArtworkCheckoutResource(Resource):
         db.session.add(payment)
         db.session.commit()
 
-        
         access_token = get_mpesa_access_token()
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -498,7 +492,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://your-callback-url/callback",  
+            "CallBackURL": "https://b150-102-214-74-3.ngrok-free.app/callback",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -538,12 +532,10 @@ class ArtworkCheckoutResource(Resource):
             db.session.commit()
             return {'error': 'Invalid response from M-Pesa API'}, 500
 
-
     @jwt_required()
     def post(self):
         try:
-            current_user = get_jwt_identity()
-            user_id = current_user.get('id')
+            user_id = get_jwt_identity()
             if not user_id:
                 return {'error': 'User ID is required'}, 400
 
@@ -558,7 +550,6 @@ class ArtworkCheckoutResource(Resource):
             user = User.query.get(user_id)
             if not user:
                 return {'error': 'User not found'}, 404
-
 
             shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
             if not shipping_address:
@@ -618,11 +609,6 @@ class ArtworkCheckoutResource(Resource):
             db.session.rollback()
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
-
-        except Exception as e:
-            db.session.rollback()
-            return {'error': f'Failed to process order: {str(e)}'}, 500
-
 
 
 @app.route('/callback', methods=['POST'])
@@ -741,8 +727,8 @@ class AddToCartResource(Resource):
     def post(self):
         data = request.get_json()
 
-        # Find or create user (assuming a user is authenticated and user_id is available)
-        user_id = data.get('user_id')  # Adjust this line as per your authentication system
+        
+        user_id = data.get('user_id') 
         if not user_id:
             return {'error': 'User ID is required'}, 400
 
@@ -750,14 +736,14 @@ class AddToCartResource(Resource):
         if not user:
             return {'error': 'User not found'}, 404
 
-        # Find or create cart for the user
+        
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             cart = Cart(user_id=user.id)
             db.session.add(cart)
             db.session.commit()
 
-        # Check if artwork exists
+        
         artwork = Artwork.query.get(data['artwork_id'])
         if not artwork:
             return {'error': 'artwork not found'}, 404
@@ -767,14 +753,13 @@ class AddToCartResource(Resource):
         
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
         if cart_item:
-            # Update the quantity if the artwork is already in the cart
-            cart_item.quantity += quantity  # Adjust quantity increment as needed
+            cart_item.quantity += quantity  
         else:
-            # Add new CartItem if the artwork is not in the cart
+            
             cart_item = CartItem(
                 cart_id=cart.id,
                 artwork_id=artwork.id,
-                quantity=quantity, # Adjust quantity as needed
+                quantity=quantity, 
                 title = artwork.title,
                 description=artwork.description,
                 price=artwork.price,
@@ -785,82 +770,6 @@ class AddToCartResource(Resource):
         db.session.commit()
 
         return {'message': 'Artwork added to cart'}, 201
-
-# class AddToCartResource(Resource):
-#     @user_required 
-#     def post(self):
-#         data = request.get_json()
-
-
-#     def post(self):
-#         data = request.get_json()
-
-#         user_id = data.get('user_id')
-#         if not user_id:
-#             return {'error': 'User ID is required'}, 400
-
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             cart = Cart(user_id=user.id)
-#             db.session.add(cart)
-#             db.session.commit()
-
-#         artwork = Artwork.query.get(data['artwork_id'])
-#         if not artwork:
-#             return {'error': 'Artwork not found'}, 404
-
-#         quantity = data.get('quantity', 1)
-
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-#         if cart_item:
-#             cart_item.quantity += quantity
-#         else:
-#             cart_item = CartItem(
-#                 cart_id=cart.id,
-#                 artwork_id=artwork.id,
-#                 quantity=quantity,
-#                 title=artwork.title,
-#                 description=artwork.description,
-#                 price=artwork.price,
-#                 image=artwork.image
-#             )
-#             db.session.add(cart_item)
-
-#         address = data.get('address')
-#         city = data.get('city')
-#         country = data.get('country')
-#         phone = data.get('phone')
-#         full_name = data.get('full_name')
-#         email = data.get('email')
-
-#         if not all([address, city, country, phone, full_name, email]):
-#             return {'error': 'All fields are required'}, 400
-
-
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if shipping_address:
-            return {'error': 'Shipping address already exists for this user'}, 400
-
-#         new_address = ShippingAddress(
-#             user_id=user_id,
-#             address=address,
-#             city=city,
-#             country=country,
-#             phone=phone,
-#             full_name=full_name,
-#             email=email
-#         )
-
-
-#         db.session.add(new_address)
-#         db.session.commit()
-
-#         return {'message': 'Shipping address created successfully', 'address': new_address.to_dict()}, 201
 
 
 class RemoveFromCartResource(Resource):
@@ -909,106 +818,111 @@ class ViewCartResource(Resource):
         cart_items_list = [item.to_dict() for item in cart_items]
 
         return {'items': cart_items_list}, 200
-      
-@app.route('/messages', methods=['POST'])
-@jwt_required()
-def send_message():
-    data = request.json
-    recipient_id = data.get('recipient_id')
-    message_text = data.get('message')
-    sender_id = get_jwt_identity()
-
-    if not recipient_id or not message_text:
-        return jsonify({"error": "Invalid data"}), 400
-
-    new_message = Message(sender=sender_id, recipient=recipient_id, message=message_text)
-    db.session.add(new_message)
-    db.session.commit()
-
-    socketio.emit('new_message', {
-        'sender': sender_id,
-        'recipient': recipient_id,
-        'message': message_text,
-        'timestamp': new_message.timestamp.isoformat()
-    }, broadcast=True)
-
-    return jsonify({"message": "Message sent"}), 201
-
-@app.route('/messages', methods=['GET'])
-@jwt_required()
-def get_messages():
-    user_id = get_jwt_identity()
-    messages = Message.query.filter((Message.sender == user_id) | (Message.recipient == user_id)).all()
     
-    return jsonify([{
-        'id': msg.id,
-        'sender': msg.sender,
-        'recipient': msg.recipient,
-        'message': msg.message,
-        'timestamp': msg.timestamp.isoformat()
-    } for msg in messages])
+
     
-@socketio.on('message')
-def handle_message(msg):
-    print('Message: ' + msg)
-    send(msg, broadcast=True)
+class SendMessageResource(Resource):
+    @jwt_required()
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('recipient_id', type=int, required=True, help="Recipient ID cannot be blank")
+        parser.add_argument('message', type=str, required=True, help="Message content cannot be blank")
+        args = parser.parse_args()
 
-@socketio.on('connect')
-def handle_connect():
-    print('Client connected')
+        recipient_id = args['recipient_id']
+        message_content = args['message']
+        sender_id = get_jwt_identity()
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('Client disconnected')
+        if not recipient_id or not message_content:
+            return {'error': 'Invalid data'}, 400
+
+        new_message = Message(
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            content=message_content
+        )
+        try:
+            Message.query.filter_by(sender_id=recipient_id, recipient_id=sender_id, is_read=False).update({'is_read': True})
+            db.session.add(new_message)
+            db.session.commit()
+        except Exception as e:
+            print(f"Database error: {e}")
+            return {'error': 'Database error'}, 500
+
+        return {'message': 'Message sent'}, 201
     
-@app.route('/dashboard', methods=['GET'])
-@jwt_required()
-def get_dashboard_overview():
-    current_user_id = get_jwt_identity()
 
-    bookings = Booking.query.filter_by(user_id=current_user_id).all()
-    notifications = Notification.query.filter_by(user_id=current_user_id).all()
-    user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
-    events = Event.query.all() 
+class GetMessagesResource(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        messages = Message.query.filter(
+            (Message.sender_id == user_id) | (Message.recipient_id == user_id)
+        ).all()
 
-    booking_data = [{
-        'id': booking.id,
-        'user_id': booking.user_id,
-        'event_id': booking.event_id,
-        'booking_date': booking.created_at.isoformat()
-    } for booking in bookings]
+        try:
+            Message.query.filter_by(recipient_id=user_id, is_read=False).update({'is_read': True})
+            db.session.commit()
+        except Exception as e:
+            print(f"Database error: {e}")
+            return {'error': 'Database error'}, 500
 
-    notification_data = [{
-        'id': notification.id,
-        'user_id': notification.user_id,
-        'message': notification.message,
-        'timestamp': notification.timestamp.isoformat()
-    } for notification in notifications]
+        return jsonify([{
+            'id': msg.id,
+            'sender': msg.sender_id,
+            'recipient': msg.recipient_id,
+            'message': msg.content,
+            'timestamp': msg.timestamp.isoformat(),
+            'is_read': msg.is_read
+        } for msg in messages])
 
-    event_data = [{
-        'id': event.id,
-        'title': event.title,
-        'description': event.description,
-        'start_date': event.start_date.isoformat(),
-        'end_date': event.end_date.isoformat()
-    } for event in events]
+class DashboardOverviewResource(Resource):
+    @jwt_required()
+    def get(self):
+        current_user_id = get_jwt_identity()
 
-    user_activity_data = [{
-        'id': activity.id,
-        'user_id': activity.user_id,
-        'activity_type': activity.activity_type,
-        'timestamp': activity.timestamp.isoformat()
-    } for activity in user_activities]
+        bookings = Booking.query.filter_by(user_id=current_user_id).all()
+        notifications = Notification.query.filter_by(user_id=current_user_id).all()
+        user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
+        events = Event.query.all()
 
-    response = {
-        'bookings': booking_data,
-        'notifications': notification_data,
-        'events': event_data,
-        'user_activities': user_activity_data
-    }
+        booking_data = [{
+            'id': booking.id,
+            'user_id': booking.user_id,
+            'event_id': booking.event_id,
+            'booking_date': booking.created_at.isoformat()
+        } for booking in bookings]
 
-    return jsonify(response)
-    
+        notification_data = [{
+            'id': notification.id,
+            'user_id': notification.user_id,
+            'message': notification.message,
+            'timestamp': notification.timestamp.isoformat()
+        } for notification in notifications]
+
+        event_data = [{
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'start_date': event.start_date.isoformat(),
+            'end_date': event.end_date.isoformat()
+        } for event in events]
+
+        user_activity_data = [{
+            'id': activity.id,
+            'user_id': activity.user_id,
+            'activity_type': activity.activity_type,
+            'timestamp': activity.timestamp.isoformat()
+        } for activity in user_activities]
+
+        response = {
+            'bookings': booking_data,
+            'notifications': notification_data,
+            'events': event_data,
+            'user_activities': user_activity_data
+        }
+
+        return jsonify(response)
 
 
 from Resources.event import EventsResource
@@ -1037,13 +951,14 @@ api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
-
-
+api.add_resource(SendMessageResource, '/messages')
+api.add_resource(GetMessagesResource, '/messages')
+api.add_resource(DashboardOverviewResource, '/dashboard')
 api.add_resource(Home, '/')
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5555)
+    socketio.run(app, debug=True)
+

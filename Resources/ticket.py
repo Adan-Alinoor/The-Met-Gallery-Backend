@@ -11,8 +11,6 @@ from dotenv import load_dotenv
 from flask import request, current_app,make_response,jsonify
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
-
-
 from models import db, Ticket, Booking, User, Payment
 
 load_dotenv()

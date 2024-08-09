@@ -101,9 +101,9 @@ class Ticket(db.Model, SerializerMixin):
     
     id = db.Column(db.Integer, primary_key=True)
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
-    type_name = db.Column(db.String, nullable=False)  # E.g., 'Regular', 'VIP', 'VVIP'
-    price = db.Column(db.Integer, nullable=False)  # Keeping price as integer
-    quantity = db.Column(db.Integer, nullable=False) # Total quantity of ticket type
+    type_name = db.Column(db.String, nullable=False) 
+    price = db.Column(db.Integer, nullable=False)  
+    quantity = db.Column(db.Integer, nullable=False)
     
     event = db.relationship('Event', back_populates='tickets')
     bookings = db.relationship('Booking', back_populates='ticket')
@@ -129,14 +129,15 @@ class CartItem(db.Model, SerializerMixin):
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Integer, nullable=False)  # Keeping price as integer
-    description = db.Column(db.String, nullable=False)
-    image = db.Column(db.String, nullable=False)
+    price = db.Column(db.Integer, nullable=False)  
     title = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    image = db.Column(db.String, nullable=True)
+
     cart = db.relationship('Cart', back_populates='items')
     artwork = db.relationship('Artwork')
 
-    serialize_only = ('id', 'cart_id', 'artwork_id', 'quantity', 'price')
+    serialize_only = ('id', 'cart_id', 'artwork_id', 'quantity', 'price', 'title', 'description', 'image')
     serialize_rules = ('-cart.items', '-artwork')
 
 
@@ -161,7 +162,7 @@ class OrderItem(db.Model, SerializerMixin):
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Integer, nullable=False)  # Keeping price as integer
+    price = db.Column(db.Integer, nullable=False) 
     
     order = db.relationship('Order', back_populates='items')
     artwork = db.relationship('Artwork')
@@ -169,26 +170,31 @@ class OrderItem(db.Model, SerializerMixin):
     serialize_only = ('id', 'order_id', 'artwork_id', 'quantity', 'price')
     serialize_rules = ('-order.items', '-artwork')
 
-
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
+    
     id = db.Column(db.Integer, primary_key=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
-    amount = db.Column(db.Integer, nullable=False)  # Keeping amount as integer
+    amount = db.Column(db.Integer, nullable=False)  
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     payment_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    phone_number = db.Column(db.String(20), nullable=False) 
+    phone_number = db.Column(db.String(20), nullable=False)
+    
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)  
+    
+    transaction_id = db.Column(db.String(255), nullable=True)
     transaction_code = db.Column(db.String, nullable=True)
     status = db.Column(db.String(50), default='pending')
     transaction_desc = db.Column(db.String(255), nullable=True)
-    result_desc = db.Column(db.String(255), nullable=True)  
+    result_desc = db.Column(db.String(255), nullable=True)
 
     user = db.relationship('User', back_populates='payments')
     booking = db.relationship('Booking', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
 
-    serialize_only = ('id', 'booking_id', 'order_id', 'amount', 'payment_date', 'status', 'transaction_code')
+    serialize_only = ('id', 'booking_id', 'order_id', 'amount', 'payment_date', 'status', 'transaction_id', 'transaction_code', 'created_at', 'updated_at')
 
 
 class ShippingAddress(db.Model, SerializerMixin):
