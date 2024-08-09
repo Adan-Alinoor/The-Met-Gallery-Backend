@@ -2,7 +2,7 @@ from flask_restful import Resource, reqparse
 from flask import jsonify, request, make_response
 from datetime import datetime
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Events
+from models import db, Event
 
 
 event_parser = reqparse.RequestParser()
@@ -22,11 +22,11 @@ class EventsResource(Resource):
        
         if id is None:
             
-            events = Events.query.all()
+            events = Event.query.all()
             return [event.to_dict() for event in events]
         else:
             
-            event = Events.query.get(id)
+            event = Event.query.get(id)
             if event is None:
                 return {"error": "Event not found"}, 404
             return event.to_dict()
@@ -36,7 +36,7 @@ class EventsResource(Resource):
         current_user_id = get_jwt_identity()
 
        
-        event = Events.query.get_or_404(id)
+        event = Event.query.get_or_404(id)
         db.session.delete(event)
         db.session.commit()
         return make_response(jsonify({'message': 'Event deleted'}), 200)
@@ -45,7 +45,7 @@ class EventsResource(Resource):
     def put(self, id):
         current_user_id = get_jwt_identity()
 
-        event = Events.query.get_or_404(id)
+        event = Event.query.get_or_404(id)
     
         args = event_parser.parse_args()
 
@@ -80,7 +80,7 @@ class EventsResource(Resource):
             return {"error": str(e)}, 400
 
         try:
-            new_event = Events(
+            new_event = Event(
                 title=args['title'],
                 image_url=args['image_url'],
                 description=args['description'],

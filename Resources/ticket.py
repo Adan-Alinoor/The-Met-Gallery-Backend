@@ -112,7 +112,7 @@ class TicketResource(Resource):
                 "AccountReference": f"Booking ('booking.id')",
                 "TransactionDesc": "Payment for event ticket purchase. Thank you for your order!"
             }
-class CheckoutResource(Resource):
+class EventCheckoutResource(Resource):
     def initiate_mpesa_payment(self, payment_data):
         user_id = payment_data.get('user_id')
         booking_id = payment_data.get('booking_id')
@@ -370,7 +370,7 @@ class TicketResource(Resource):
             'amount': amount
         }
 
-        checkout_resource = CheckoutResource()
+        checkout_resource = EventCheckoutResource()
         payment_response = checkout_resource.initiate_mpesa_payment(payment_data)
 
         if payment_response[1] != 201:
