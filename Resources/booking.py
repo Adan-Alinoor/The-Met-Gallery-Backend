@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse
 from datetime import datetime
-from models import db, Booking, User, Events, Ticket
+from models import db, Booking, User, Event, Ticket
 from flask import jsonify, make_response, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 

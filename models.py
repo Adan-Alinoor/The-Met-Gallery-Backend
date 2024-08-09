@@ -1,11 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin, LoginManager
-from flask_login import UserMixin, LoginManager
 from sqlalchemy import MetaData
 from datetime import datetime
 from sqlalchemy_serializer import SerializerMixin
-from datetime import datetime
+from flask_marshmallow import Marshmallow
 
+db = SQLAlchemy()
+ma = Marshmallow()
 
 convention = {
     "ix": 'ix_%(column_0_label)s',
@@ -44,8 +45,6 @@ class Artwork(db.Model, SerializerMixin):
 
     serialize_only = ('id', 'title', 'description', 'price', 'image')
 
-
-
 class User(db.Model, SerializerMixin, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -54,23 +53,50 @@ class User(db.Model, SerializerMixin, UserMixin):
     password = db.Column(db.String, nullable=False)
     role = db.Column(db.String(50), nullable=False, default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    role = db.Column(db.String(50), nullable=False, default='user')
     is_admin = db.Column(db.Boolean, default=False)  
     is_seller = db.Column(db.Boolean, default=False)
-    
+
     cart = db.relationship('Cart', back_populates='user', uselist=False)
     payments = db.relationship('Payment', back_populates='user')
     orders = db.relationship('Order', back_populates='user')
     bookings = db.relationship('Booking', back_populates='user')
 
-    payments = db.relationship('Payment', back_populates='user')
     shipping_addresses = db.relationship('ShippingAddress', back_populates='user', cascade='all, delete-orphan')
 
+    serialize_only = ('id', 'username', 'email', 'role', 'is_admin')
 
-    serialize_only = ('id', 'username', 'email', 'role', 'is_admin') 
+class Booking(db.Model, SerializerMixin):
+    __tablename__ = 'bookings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
+    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
+    status = db.Column(db.String, default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    user = db.relationship('User', back_populates='bookings')
+    event = db.relationship('Event', back_populates='bookings')
+    ticket = db.relationship('Ticket', back_populates='bookings')
+    payments = db.relationship('Payment', back_populates='bookings')
 
-class Events(db.Model, SerializerMixin):
+    serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
+    serialize_rules = ('-user.bookings', '-event.bookings', '-ticket.bookings', '-payments.booking')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'event_id': self.event_id,
+            'ticket_id': self.ticket_id,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
+        }
+
+    def _repr_(self):
+        return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
+
+class Event(db.Model, SerializerMixin):
     __tablename__ = 'events'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -106,39 +132,7 @@ class Events(db.Model, SerializerMixin):
     def __repr__(self):
         return f"Event('{self.title}', '{self.start_date}')"
 
-class Booking(db.Model, SerializerMixin):
-    __tablename__ = 'bookings'
     
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
-    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
-    status = db.Column(db.String, default='pending')  # e.g., 'Confirmed', 'Cancelled'
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    user = db.relationship('User', back_populates='bookings')
-    event = db.relationship('Events', back_populates='bookings')
-    ticket = db.relationship('Ticket', back_populates='bookings')
-    payments = db.relationship('Payment', back_populates='bookings') 
-
-    serialize_only = ('id', 'user_id', 'event_id', 'ticket_id', 'status', 'created_at')
-    serialize_rules = ('user', 'event', 'ticket', 'payment')
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id':self.user_id,
-            'event_id': self.event_id,
-            'ticket_id': self.ticket_id,
-            'status': self.status,
-            'created_at': self.created_at.isoformat()
-        }
-
-    def __repr__(self):
-        return f"Booking('{self.user_id}', '{self.event_id}', '{self.ticket_id}')"
-    
-
-
 class Ticket(db.Model, SerializerMixin):
     __tablename__ = 'tickets'
     
@@ -148,7 +142,7 @@ class Ticket(db.Model, SerializerMixin):
     price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False) # Total quantity of ticket type
     
-    event = db.relationship('Events', back_populates='tickets')
+    event = db.relationship('Event', back_populates='tickets')
     bookings = db.relationship('Booking', back_populates='ticket')
 
     serialize_only = ('id', 'event_id', 'type_name', 'price', 'quantity')
@@ -232,14 +226,13 @@ class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
-    artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
     
     order = db.relationship('Order', back_populates='items')
 
     arwork = db.relationship('Artwork')
-    artwork = db.relationship('Artwork')  
+ 
 
     def to_dict(self):
         return{
@@ -251,20 +244,6 @@ class OrderItem(db.Model):
             'artwork': self.artwork.to_dict() 
         }
       
-
-
-    artwork = db.relationship('Artwork')
-
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'order_id': self.order_id,
-            'artwork_id': self.artwork_id,
-            'quantity': self.quantity,
-            'price': self.price,
-            'artwork': self.artwork.to_dict()
-        }
 
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
@@ -310,22 +289,36 @@ class ShippingAddress(db.Model, SerializerMixin):
             'country': self.country,
             'phone': self.phone
         }
-      
-class Message(db.Model):
+
+
+class Message(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
-    sender = db.Column(db.String(80), nullable=False)
-    recipient = db.Column(db.String(80), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-       
-class UserActivity(db.Model):
+    
+    sender_user = db.relationship('User', foreign_keys=[sender_id], back_populates='sent_messages')
+    recipient_user = db.relationship('User', foreign_keys=[recipient_id], back_populates='received_messages')
+
+    serialize_only = ('id', 'sender_user.username', 'recipient_user.username', 'message', 'timestamp')
+
+class UserActivity(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     activity_type = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False)
- 
-class Notification(db.Model):
+
+    user = db.relationship('User', back_populates='activities')
+    
+    serialize_only = ('id', 'user.username', 'activity_type', 'timestamp')
+
+class Notification(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     message = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship('User', back_populates='notifications')
+    
+    serialize_only = ('id', 'user.username', 'message', 'timestamp')

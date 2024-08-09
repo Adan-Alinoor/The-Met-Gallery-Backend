@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Events, UserActivity, Booking
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime
@@ -27,7 +27,7 @@ from flask_socketio import SocketIO, send, emit
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///MetGallery.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -900,7 +900,7 @@ def get_dashboard_overview():
     bookings = Booking.query.filter_by(user_id=current_user_id).all()
     notifications = Notification.query.filter_by(user_id=current_user_id).all()
     user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
-    events = Events.query.all() 
+    events = Event.query.all() 
 
     booking_data = [{
         'id': booking.id,
