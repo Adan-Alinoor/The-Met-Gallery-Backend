@@ -36,3 +36,4 @@ def admin_or_seller_required(fn):
             return {'error': 'Admin or seller access required'}, 403
         return fn(*args, **kwargs)
     return wrapper
+
