@@ -5,10 +5,10 @@ name = "pypi"
 
 [packages]
 flask = "*"
+flask-migrate = "*"
 flask-sqlalchemy = "*"
 flask-jwt-extended = "*"
 flask-bcrypt = "*"
-flask-migrate = "*"
 flask-restful = "*"
 flask-cors = "*"
 sqlalchemy-serializer = "*"
@@ -16,12 +16,13 @@ sqlalchemy = "*"
 python-dotenv = "*"
 faker = "*"
 requests = "*"
-flask-login = "*"
 bcrypt = "*"
 marshmallow = "*"
-dotenv = "*"
+flask-login = "*"
+flask-marshmallow = "*"
+flask-socketio = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.8"
+python_version = "3.10"
