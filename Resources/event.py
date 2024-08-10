@@ -1,7 +1,9 @@
 from flask_restful import Resource, reqparse
 from flask import jsonify, request, make_response
 from datetime import datetime
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity,get_jwt
+import logging
+
 from models import db, Event
 
 
@@ -15,21 +17,22 @@ event_parser.add_argument('time', type=str, required=True, help='Time is require
 event_parser.add_argument('location', type=str, required=True, help='Location is required')
 
 class EventsResource(Resource):
-  
-
-    @jwt_required() 
+    @jwt_required()
     def get(self, id=None):
-       
+        # Get the JWT token from the request
+        token = get_jwt()
+        logging.info(f"Received token: {token}")
+
         if id is None:
-            
+            # Fetch all events
             events = Event.query.all()
-            return [event.to_dict() for event in events]
+            return jsonify([event.to_dict() for event in events])
         else:
-            
+            # Fetch a specific event by ID
             event = Event.query.get(id)
             if event is None:
                 return {"error": "Event not found"}, 404
-            return event.to_dict()
+            return jsonify(event.to_dict())
 
     @jwt_required()  
     def delete(self, id):

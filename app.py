@@ -149,7 +149,28 @@ class AdminResource(Resource):
     def get(self):
         return {'message': 'Admin content accessible'}
 
-
+class UsersResource(Resource):
+    @jwt_required()
+    def get(self):
+        # Get the identity of the current user
+        current_user = get_jwt_identity()
+        
+        # Optionally, you can check the user's role or any other attribute
+        # For example, if you want to restrict access to admins only
+        # if current_user['role'] != 'admin':
+        #     return {'message': 'Access forbidden: Admins only'}, 403
+        
+        # Query all users
+        users = User.query.all()
+        
+        # Return user data
+        return jsonify([{
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at
+        } for user in users])
 
 
 class ArtworkListResource(Resource):
@@ -955,6 +976,7 @@ api.add_resource(SendMessageResource, '/messages')
 api.add_resource(GetMessagesResource, '/messages')
 api.add_resource(DashboardOverviewResource, '/dashboard')
 api.add_resource(Home, '/')
+api.add_resource(UsersResource, '/users')
 
 logging.basicConfig(level=logging.DEBUG)
 
