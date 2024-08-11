@@ -116,21 +116,32 @@ class Signup(Resource):
         
 #         return jsonify({'message': 'Invalid email or password'}), 401
 
+
 class Login(Resource):
     def post(self):
         email = request.json.get('email')
         password = request.json.get('password')
         user = User.query.filter_by(email=email).first()
-        
-        if user and check_password_hash(user.password, password):
-            access_token = create_access_token(identity=user.id)
-            return make_response({
-                "user": user.to_dict(),
-                "access_token": access_token,
-                "success": True,
-                "message": "Login successful"
-            }, 200)
-        return make_response({"message": "Invalid credentials"}, 401)
+
+        # Check if the user exists and the password hash is valid
+        if user:
+            try:
+                if check_password_hash(user.password, password):
+                    access_token = create_access_token(identity=user.id)
+                    return make_response({
+                        "user": user.to_dict(),
+                        "access_token": access_token,
+                        "success": True,
+                        "message": "Login successful"
+                    }, 200)
+                else:
+                    return make_response({"message": "Invalid credentials"}, 401)
+            except ValueError as e:
+                # Log the error and return an appropriate message
+                app.logger.error(f"Password check failed: {str(e)}")
+                return make_response({"message": "An error occurred during login"}, 500)
+        else:
+            return make_response({"message": "Invalid credentials"}, 401)
     
 #add
 class VerifyToken(Resource):
