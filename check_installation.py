@@ -1,0 +1,2 @@
+import flask_jwt_extended
+print(flask_jwt_extended.__file__)

@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking,get_user_by_id
 import bcrypt
 import base64
 from datetime import datetime,timedelta
+from marshmallow import Schema, fields
+from flask_jwt_extended import decode_token
 
 import os
 from flask import Flask, request, jsonify
@@ -25,6 +27,8 @@ from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 
 from flask_socketio import SocketIO, send, emit
+
+
 
 
 app = Flask(__name__)
@@ -90,6 +94,56 @@ class Logout(Resource):
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
         return {'message': f"{user.role.capitalize()} logged out successfully"}, 200
+
+class UserSchema(Schema):
+    name = fields.Str(required=True)
+    email = fields.Email(required=True)
+    bio = fields.Str(allow_none=True)  # bio is optional
+    profilePicture = fields.Url(required=False, missing='https://i.pinimg.com/564x/91/c9/60/91c960ce7fcd5d246597adbc5118bba4.jpg')  # default profile picture
+
+def decode_token_and_get_user_id(token):
+    try:
+        decoded_token = decode_token(token)
+        print("Decoded Token:", decoded_token)
+        return decoded_token.get('sub')  # Adjust based on your token payload
+    except Exception as e:
+        print(f"Token decoding failed: {e}")
+        return None
+
+class UserRetrieval:
+    @staticmethod
+    def get_user_from_token(token):
+        user_id = decode_token_and_get_user_id(token)
+        print("User ID from Token:", user_id)  # Debugging line
+        if not user_id:
+            return None
+        
+        user = get_user_by_id(user_id)
+        print("User from Database:", user)  # Debugging line
+        if user:
+            return {
+                "name": user.name,
+                "email": user.email,
+                "bio": user.bio or None,
+                "profilePicture": user.profile_picture or 'https://i.pinimg.com/564x/91/c9/60/91c960ce7fcd5d246597adbc5118bba4.jpg'
+            }
+        return None
+
+class UserProfile(Resource):
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()  # Get the current user ID from the token
+        print("Current User ID:", current_user)  # Debugging line
+
+        if not current_user:
+            return jsonify({"message": "Invalid token or user not found"}), 401
+
+        user = UserRetrieval.get_user_from_token(current_user)  # Fetch user details from your data source
+        if user is None:
+            return jsonify({"message": "User not found"}), 404
+
+        user_schema = UserSchema()
+        return jsonify(user_schema.dump(user))
 
 class UserResource(Resource):
     @jwt_required()
@@ -958,6 +1012,7 @@ api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
 api.add_resource(Logout, '/logout')
 api.add_resource(UserResource, '/user')
+api.add_resource(UserProfile, '/userprofile')
 api.add_resource(AdminResource, '/admin')
 api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
