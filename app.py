@@ -1,7 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking,get_user_by_id
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime,timedelta
@@ -16,6 +16,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_restful import Resource, Api, reqparse
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask_cors import CORS
 import logging
 from sqlalchemy.exc import SQLAlchemyError
@@ -36,6 +38,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("EXTERNAL_DATABASE_URL")
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -47,45 +50,101 @@ jwt = JWTManager(app)
 api = Api(app)
 CORS(app)
 
-class Signup(Resource):
-    def post(self):
-        args = request.get_json()
-        if not all(k in args for k in ('username', 'email', 'password')):
-            return {'message': 'Username, email, and password are required'}, 400
+# class Signup(Resource):
+#     def post(self):
+#         args = request.get_json()
+#         if not all(k in args for k in ('username', 'email', 'password')):
+#             return {'message': 'Username, email, and password are required'}, 400
         
-        role = args.get('role', 'user')  
-        hashed_password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        new_user = User(username=args['username'], email=args['email'], password=hashed_password, role=role)
+#         role = args.get('role', 'user')  
+#         hashed_password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+#         new_user = User(username=args['username'], email=args['email'], password=hashed_password, role=role)
+#         db.session.add(new_user)
+#         db.session.commit()
+
+#         return {'message': f"{role.capitalize()} created successfully"}, 201
+
+class Signup(Resource):
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()
+        users = User.query.all()
+        users_list = [user.to_dict() for user in users]
+        return make_response({"count": len(users_list), "users": users_list}, 200)
+
+    def post(self):
+        email = User.query.filter_by(email=request.json.get('email')).first()
+        if email:
+            return make_response({"message": "Email already taken"}, 422)
+
+        new_user = User(
+            username=request.json.get("username"),
+            email=request.json.get("email"),
+            password=generate_password_hash(request.json.get("password")),
+            role=request.json.get("role", "user")
+        )
+
         db.session.add(new_user)
         db.session.commit()
 
-        return {'message': f"{role.capitalize()} created successfully"}, 201
+        access_token = create_access_token(identity=new_user.id)
+        return make_response({"user": new_user.to_dict(), "access_token": access_token, "success": True, "message": "User has been created successfully"}, 201)
     
 
+# class Login(Resource):
+#     def __init__(self):
+#         self.parser = reqparse.RequestParser()
+#         self.parser.add_argument('email', type=str, required=True, help='Email cannot be blank')
+#         self.parser.add_argument('password', type=str, required=True, help='Password cannot be blank')
+
+#     def post(self):
+#         args = self.parser.parse_args()
+#         email = args['email']
+#         password = args['password']
+
+#         user = User.query.filter_by(email=email).first()
+        
+#         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+#             access_token = create_access_token(identity=user.id)
+#             response = {
+#                 'message': f"{user.role.capitalize()} logged in successfully",
+#                 'access_token': access_token,
+#                 'role': user.role  
+#             }
+#             print("Response Data:", response) 
+#             return jsonify(response)
+        
+#         return jsonify({'message': 'Invalid email or password'}), 401
+
 class Login(Resource):
-    def __init__(self):
-        self.parser = reqparse.RequestParser()
-        self.parser.add_argument('email', type=str, required=True, help='Email cannot be blank')
-        self.parser.add_argument('password', type=str, required=True, help='Password cannot be blank')
-
     def post(self):
-        args = self.parser.parse_args()
-        email = args['email']
-        password = args['password']
-
+        email = request.json.get('email')
+        password = request.json.get('password')
         user = User.query.filter_by(email=email).first()
         
-        if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        if user and check_password_hash(user.password, password):
             access_token = create_access_token(identity=user.id)
-            response = {
-                'message': f"{user.role.capitalize()} logged in successfully",
-                'access_token': access_token,
-                'role': user.role  
-            }
-            print("Response Data:", response) 
-            return jsonify(response)
-        
-        return jsonify({'message': 'Invalid email or password'}), 401
+            return make_response({
+                "user": user.to_dict(),
+                "access_token": access_token,
+                "success": True,
+                "message": "Login successful"
+            }, 200)
+        return make_response({"message": "Invalid credentials"}, 401)
+    
+#add
+class VerifyToken(Resource):
+    @jwt_required()
+    def post(self):
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if user:
+            return make_response({
+                "user": user.to_dict(),
+                "success": True,
+                "message": "Token is valid"
+            }, 200)
+        return make_response({"message": "Invalid token"}, 401)    
 
 
 class Logout(Resource):
@@ -103,9 +162,21 @@ class UserSchema(Schema):
 
 def decode_token_and_get_user_id(token):
     try:
+        # Ensure the token is of type bytes
+        if isinstance(token, str):
+            token = token.encode('utf-8')  # Convert string to bytes if necessary
+        
         decoded_token = decode_token(token)
         print("Decoded Token:", decoded_token)
-        return decoded_token.get('sub')  # Adjust based on your token payload
+        
+        # Ensure the 'sub' field exists in the decoded token
+        user_id = decoded_token.get('sub')
+        if user_id:
+            return user_id
+        else:
+            print("Token does not contain 'sub' field")
+            return None
+
     except Exception as e:
         print(f"Token decoding failed: {e}")
         return None
@@ -136,14 +207,15 @@ class UserProfile(Resource):
         print("Current User ID:", current_user)  # Debugging line
 
         if not current_user:
-            return jsonify({"message": "Invalid token or user not found"}), 401
+            return {"message": "Invalid token or user not found"}, 401  # Return a dictionary, not a Response object
 
         user = UserRetrieval.get_user_from_token(current_user)  # Fetch user details from your data source
         if user is None:
-            return jsonify({"message": "User not found"}), 404
+            return {"message": "User not found"}, 404  # Return a dictionary, not a Response object
 
         user_schema = UserSchema()
-        return jsonify(user_schema.dump(user))
+        return user_schema.dump(user)  # This will return a dictionary, which flask_restful will serialize to JSON
+
 
 class UserResource(Resource):
     @jwt_required()
@@ -1008,7 +1080,7 @@ from Resources.ticket import EventCheckoutResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
     
-api.add_resource(Signup, '/signup')
+# api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
 api.add_resource(Logout, '/logout')
 api.add_resource(UserResource, '/user')
@@ -1032,6 +1104,9 @@ api.add_resource(GetMessagesResource, '/messages')
 api.add_resource(DashboardOverviewResource, '/dashboard')
 api.add_resource(Home, '/')
 api.add_resource(UsersResource, '/users')
+api.add_resource(Signup, '/signup')
+# api.add_resource(Login, '/login')
+api.add_resource(VerifyToken, '/verify-token')
 
 logging.basicConfig(level=logging.DEBUG)
 
