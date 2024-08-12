@@ -51,19 +51,6 @@ jwt = JWTManager(app)
 api = Api(app)
 CORS(app)
 
-# class Signup(Resource):
-#     def post(self):
-#         args = request.get_json()
-#         if not all(k in args for k in ('username', 'email', 'password')):
-#             return {'message': 'Username, email, and password are required'}, 400
-        
-#         role = args.get('role', 'user')  
-#         hashed_password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-#         new_user = User(username=args['username'], email=args['email'], password=hashed_password, role=role)
-#         db.session.add(new_user)
-#         db.session.commit()
-
-#         return {'message': f"{role.capitalize()} created successfully"}, 201
 
 class Signup(Resource):
     @jwt_required()
@@ -90,33 +77,6 @@ class Signup(Resource):
 
         access_token = create_access_token(identity=new_user.id)
         return make_response({"user": new_user.to_dict(), "access_token": access_token, "success": True, "message": "User has been created successfully"}, 201)
-    
-
-# class Login(Resource):
-#     def __init__(self):
-#         self.parser = reqparse.RequestParser()
-#         self.parser.add_argument('email', type=str, required=True, help='Email cannot be blank')
-#         self.parser.add_argument('password', type=str, required=True, help='Password cannot be blank')
-
-#     def post(self):
-#         args = self.parser.parse_args()
-#         email = args['email']
-#         password = args['password']
-
-#         user = User.query.filter_by(email=email).first()
-        
-#         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-#             access_token = create_access_token(identity=user.id)
-#             response = {
-#                 'message': f"{user.role.capitalize()} logged in successfully",
-#                 'access_token': access_token,
-#                 'role': user.role  
-#             }
-#             print("Response Data:", response) 
-#             return jsonify(response)
-        
-#         return jsonify({'message': 'Invalid email or password'}), 401
-
 
 class Login(Resource):
     def post(self):
