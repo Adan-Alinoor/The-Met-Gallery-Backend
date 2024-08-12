@@ -7,6 +7,7 @@ import base64
 from datetime import datetime,timedelta
 from marshmallow import Schema, fields
 from flask_jwt_extended import decode_token
+from flask_marshmallow import Marshmallow
 
 import os
 from flask import Flask, request, jsonify
@@ -42,7 +43,7 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-
+ma = Marshmallow(app)
 
 migrate = Migrate(app, db)
 db.init_app(app) 
@@ -311,7 +312,7 @@ class UsersResource(Resource):
 
 
 class ArtworkListResource(Resource):
-    @user_required
+    @jwt_required()
     def get(self):
         try:
             artworks = Artwork.query.all()
