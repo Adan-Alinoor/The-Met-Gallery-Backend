@@ -52,6 +52,57 @@ api = Api(app)
 CORS(app)
 
 
+# class Signup(Resource):
+#     @jwt_required()
+#     def get(self):
+#         current_user = get_jwt_identity()
+#         users = User.query.all()
+#         users_list = [user.to_dict() for user in users]
+#         return make_response({"count": len(users_list), "users": users_list}, 200)
+
+#     def post(self):
+#         email = User.query.filter_by(email=request.json.get('email')).first()
+#         if email:
+#             return make_response({"message": "Email already taken"}, 422)
+
+#         new_user = User(
+#             username=request.json.get("username"),
+#             email=request.json.get("email"),
+#             password=generate_password_hash(request.json.get("password")),
+#             role=request.json.get("role", "user")
+#         )
+
+#         db.session.add(new_user)
+#         db.session.commit()
+
+#         access_token = create_access_token(identity=new_user.id)
+#         return make_response({"user": new_user.to_dict(), "access_token": access_token, "success": True, "message": "User has been created successfully"}, 201)
+
+# class Login(Resource):
+#     def post(self):
+#         email = request.json.get('email')
+#         password = request.json.get('password')
+#         user = User.query.filter_by(email=email).first()
+
+#         # Check if the user exists and the password hash is valid
+#         if user:
+#             try:
+#                 if check_password_hash(user.password, password):
+#                     access_token = create_access_token(identity=user.id)
+#                     return make_response({
+#                         "user": user.to_dict(),
+#                         "access_token": access_token,
+#                         "success": True,
+#                         "message": "Login successful"
+#                     }, 200)
+#                 else:
+#                     return make_response({"message": "Invalid credentials"}, 401)
+#             except ValueError as e:
+#                 # Log the error and return an appropriate message
+#                 app.logger.error(f"Password check failed: {str(e)}")
+#                 return make_response({"message": "An error occurred during login"}, 500)
+#         else:
+#             return make_response({"message": "Invalid credentials"}, 401)
 class Signup(Resource):
     @jwt_required()
     def get(self):
@@ -65,18 +116,32 @@ class Signup(Resource):
         if email:
             return make_response({"message": "Email already taken"}, 422)
 
+        # Fetch the role and is_admin values from the request
+        role = request.json.get("role", "user")
+        is_admin = request.json.get("is_admin", False)
+
+        # If is_admin is True, override the role to 'admin'
+        if is_admin:
+            role = "admin"
+
         new_user = User(
             username=request.json.get("username"),
             email=request.json.get("email"),
             password=generate_password_hash(request.json.get("password")),
-            role=request.json.get("role", "user")
+            role=role,
+            is_admin=is_admin
         )
 
         db.session.add(new_user)
         db.session.commit()
 
         access_token = create_access_token(identity=new_user.id)
-        return make_response({"user": new_user.to_dict(), "access_token": access_token, "success": True, "message": "User has been created successfully"}, 201)
+        return make_response({
+            "user": new_user.to_dict(),
+            "access_token": access_token,
+            "success": True,
+            "message": "User has been created successfully"
+        }, 201)
 
 class Login(Resource):
     def post(self):
@@ -84,27 +149,17 @@ class Login(Resource):
         password = request.json.get('password')
         user = User.query.filter_by(email=email).first()
 
-        # Check if the user exists and the password hash is valid
-        if user:
-            try:
-                if check_password_hash(user.password, password):
-                    access_token = create_access_token(identity=user.id)
-                    return make_response({
-                        "user": user.to_dict(),
-                        "access_token": access_token,
-                        "success": True,
-                        "message": "Login successful"
-                    }, 200)
-                else:
-                    return make_response({"message": "Invalid credentials"}, 401)
-            except ValueError as e:
-                # Log the error and return an appropriate message
-                app.logger.error(f"Password check failed: {str(e)}")
-                return make_response({"message": "An error occurred during login"}, 500)
-        else:
-            return make_response({"message": "Invalid credentials"}, 401)
+        if user and check_password_hash(user.password, password):
+            access_token = create_access_token(identity=user.id)
+            return make_response({
+                "user": user.to_dict(),
+                "is_admin": user.is_admin,
+                "access_token": access_token,
+                "success": True,
+                "message": "Login successful"
+            }, 200)
+        return make_response({"message": "Invalid credentials"}, 401)
     
-#add
 class VerifyToken(Resource):
     @jwt_required()
     def post(self):

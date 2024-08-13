@@ -29,9 +29,7 @@ class Artwork(db.Model, SerializerMixin):
     price = db.Column(db.Integer, nullable=False)
     image = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
     serialize_only = ('id', 'title', 'description', 'price', 'image', 'created_at')
-
 
 class User(db.Model, SerializerMixin, UserMixin):
     __tablename__ = 'users'
@@ -55,7 +53,6 @@ class User(db.Model, SerializerMixin, UserMixin):
     notifications = db.relationship('Notification', back_populates='user', cascade='all, delete-orphan')
 
     serialize_only = ('id', 'username', 'email', 'role', 'is_admin', 'created_at')
-
 
 class Booking(db.Model, SerializerMixin):
     __tablename__ = 'bookings'
@@ -95,7 +92,6 @@ class Event(db.Model, SerializerMixin):
 
     serialize_rules = ('-bookings', '-tickets')
 
-
 class Ticket(db.Model, SerializerMixin):
     __tablename__ = 'tickets'
     
@@ -111,7 +107,6 @@ class Ticket(db.Model, SerializerMixin):
     serialize_only = ('id', 'event_id', 'type_name', 'price', 'quantity')
     serialize_rules = ('-event.tickets', '-bookings.ticket')
 
-
 class Cart(db.Model, SerializerMixin):
     __tablename__ = 'carts'
     id = db.Column(db.Integer, primary_key=True)
@@ -121,7 +116,6 @@ class Cart(db.Model, SerializerMixin):
     items = db.relationship('CartItem', back_populates='cart', cascade='all, delete-orphan')
     
     serialize_only = ('id', 'user_id', 'items')
-
 
 class CartItem(db.Model, SerializerMixin):
     __tablename__ = 'cart_items'
@@ -140,21 +134,19 @@ class CartItem(db.Model, SerializerMixin):
     serialize_only = ('id', 'cart_id', 'artwork_id', 'quantity', 'price', 'title', 'description', 'image')
     serialize_rules = ('-cart.items', '-artwork')
 
-
 class Order(db.Model, SerializerMixin):
     __tablename__ = 'orders'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    status = db.Column(db.String, default='pending')
+    total_price = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    shipping_address_id = db.Column(db.Integer, db.ForeignKey('shipping_addresses.id'), nullable=True)
-    
+
     user = db.relationship('User', back_populates='orders')
     items = db.relationship('OrderItem', back_populates='order', cascade='all, delete-orphan')
-    payments = db.relationship('Payment', back_populates='order', cascade='all, delete-orphan')
-    shipping_address = db.relationship('ShippingAddress', back_populates='orders')
+    payments = db.relationship('Payment', back_populates='order')
 
-    serialize_only = ('id', 'user_id', 'created_at', 'items', 'payments', 'shipping_address')
-
+    serialize_only = ('id', 'user_id', 'status', 'total_price', 'created_at')
 
 class OrderItem(db.Model, SerializerMixin):
     __tablename__ = 'order_items'
@@ -162,45 +154,38 @@ class OrderItem(db.Model, SerializerMixin):
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Integer, nullable=False) 
-    
+    price = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    image = db.Column(db.String, nullable=True)
+
     order = db.relationship('Order', back_populates='items')
     artwork = db.relationship('Artwork')
 
-    serialize_only = ('id', 'order_id', 'artwork_id', 'quantity', 'price')
+    serialize_only = ('id', 'order_id', 'artwork_id', 'quantity', 'price', 'title', 'description', 'image')
     serialize_rules = ('-order.items', '-artwork')
 
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
-    
     id = db.Column(db.Integer, primary_key=True)
-    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
-    amount = db.Column(db.Integer, nullable=False)  
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    payment_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    phone_number = db.Column(db.String(20), nullable=False)
-    
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)  
-    
-    transaction_id = db.Column(db.String(255), nullable=True)
-    transaction_code = db.Column(db.String, nullable=True)
-    status = db.Column(db.String(50), default='pending')
-    transaction_desc = db.Column(db.String(255), nullable=True)
-    result_desc = db.Column(db.String(255), nullable=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'))
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))  # Add this line
+    amount = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='payments')
-    booking = db.relationship('Booking', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
+    booking = db.relationship('Booking', back_populates='payments')  # Add this line
 
-    serialize_only = ('id', 'booking_id', 'order_id', 'amount', 'payment_date', 'status', 'transaction_id', 'transaction_code', 'created_at', 'updated_at')
+    serialize_only = ('id', 'user_id', 'order_id', 'booking_id', 'amount', 'status', 'created_at')
 
 
 class ShippingAddress(db.Model, SerializerMixin):
     __tablename__ = 'shipping_addresses'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     full_name = db.Column(db.String, nullable=False)
     email = db.Column(db.String, nullable=False)
     address = db.Column(db.String, nullable=False)
@@ -209,10 +194,8 @@ class ShippingAddress(db.Model, SerializerMixin):
     phone = db.Column(db.String, nullable=False)
 
     user = db.relationship('User', back_populates='shipping_addresses')
-    orders = db.relationship('Order', back_populates='shipping_address')
 
     serialize_only = ('id', 'user_id', 'full_name', 'email', 'address', 'city', 'country', 'phone')
-
 
 class Message(db.Model, SerializerMixin):
     __tablename__ = 'messages'
@@ -220,36 +203,32 @@ class Message(db.Model, SerializerMixin):
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    is_read = db.Column(db.Boolean, default=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     sender_user = db.relationship('User', foreign_keys=[sender_id], back_populates='sent_messages')
     recipient_user = db.relationship('User', foreign_keys=[recipient_id], back_populates='received_messages')
 
-    serialize_only = ('id', 'sender_id', 'recipient_id', 'content', 'timestamp', 'is_read')
-    serialize_rules = ('-sender_user.sent_messages', '-recipient_user.received_messages')
-
+    serialize_only = ('id', 'sender_id', 'recipient_id', 'content', 'sent_at')
 
 class UserActivity(db.Model, SerializerMixin):
     __tablename__ = 'user_activities'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    action = db.Column(db.String(255), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    activity_type = db.Column(db.String, nullable=False)
+    description = db.Column(db.String)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='activities')
 
-    serialize_only = ('id', 'user_id', 'action', 'timestamp')
-
+    serialize_only = ('id', 'user_id', 'activity_type', 'description', 'created_at')
 
 class Notification(db.Model, SerializerMixin):
     __tablename__ = 'notifications'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    content = db.Column(db.String(255), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    is_read = db.Column(db.Boolean, default=False)
+    message = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', back_populates='notifications')
 
-    serialize_only = ('id', 'user_id', 'content', 'timestamp', 'is_read')
+    serialize_only = ('id', 'user_id', 'message', 'created_at')
