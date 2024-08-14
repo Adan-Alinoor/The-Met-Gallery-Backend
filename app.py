@@ -51,58 +51,6 @@ jwt = JWTManager(app)
 api = Api(app)
 CORS(app)
 
-
-# class Signup(Resource):
-#     @jwt_required()
-#     def get(self):
-#         current_user = get_jwt_identity()
-#         users = User.query.all()
-#         users_list = [user.to_dict() for user in users]
-#         return make_response({"count": len(users_list), "users": users_list}, 200)
-
-#     def post(self):
-#         email = User.query.filter_by(email=request.json.get('email')).first()
-#         if email:
-#             return make_response({"message": "Email already taken"}, 422)
-
-#         new_user = User(
-#             username=request.json.get("username"),
-#             email=request.json.get("email"),
-#             password=generate_password_hash(request.json.get("password")),
-#             role=request.json.get("role", "user")
-#         )
-
-#         db.session.add(new_user)
-#         db.session.commit()
-
-#         access_token = create_access_token(identity=new_user.id)
-#         return make_response({"user": new_user.to_dict(), "access_token": access_token, "success": True, "message": "User has been created successfully"}, 201)
-
-# class Login(Resource):
-#     def post(self):
-#         email = request.json.get('email')
-#         password = request.json.get('password')
-#         user = User.query.filter_by(email=email).first()
-
-#         # Check if the user exists and the password hash is valid
-#         if user:
-#             try:
-#                 if check_password_hash(user.password, password):
-#                     access_token = create_access_token(identity=user.id)
-#                     return make_response({
-#                         "user": user.to_dict(),
-#                         "access_token": access_token,
-#                         "success": True,
-#                         "message": "Login successful"
-#                     }, 200)
-#                 else:
-#                     return make_response({"message": "Invalid credentials"}, 401)
-#             except ValueError as e:
-#                 # Log the error and return an appropriate message
-#                 app.logger.error(f"Password check failed: {str(e)}")
-#                 return make_response({"message": "An error occurred during login"}, 500)
-#         else:
-#             return make_response({"message": "Invalid credentials"}, 401)
 class Signup(Resource):
     @jwt_required()
     def get(self):
@@ -184,19 +132,17 @@ class Logout(Resource):
 class UserSchema(Schema):
     name = fields.Str(required=True)
     email = fields.Email(required=True)
-    bio = fields.Str(allow_none=True)  # bio is optional
-    profilePicture = fields.Url(required=False, missing='https://i.pinimg.com/564x/91/c9/60/91c960ce7fcd5d246597adbc5118bba4.jpg')  # default profile picture
+    bio = fields.Str(allow_none=True)
+    profilePicture = fields.Url(required=False, missing='https://i.pinimg.com/564x/91/c9/60/91c960ce7fcd5d246597adbc5118bba4.jpg')
 
 def decode_token_and_get_user_id(token):
     try:
-        # Ensure the token is of type bytes
         if isinstance(token, str):
-            token = token.encode('utf-8')  # Convert string to bytes if necessary
+            token = token.encode('utf-8')
         
         decoded_token = decode_token(token)
         print("Decoded Token:", decoded_token)
         
-        # Ensure the 'sub' field exists in the decoded token
         user_id = decoded_token.get('sub')
         if user_id:
             return user_id
@@ -212,12 +158,12 @@ class UserRetrieval:
     @staticmethod
     def get_user_from_token(token):
         user_id = decode_token_and_get_user_id(token)
-        print("User ID from Token:", user_id)  # Debugging line
+        print("User ID from Token:", user_id)
         if not user_id:
             return None
         
-        user = get_user_by_id(user_id)
-        print("User from Database:", user)  # Debugging line
+        user = User.query.get(user_id)
+        print("User from Database:", user)
         if user:
             return {
                 "name": user.name,
@@ -230,18 +176,18 @@ class UserRetrieval:
 class UserProfile(Resource):
     @jwt_required()
     def get(self):
-        current_user = get_jwt_identity()  # Get the current user ID from the token
-        print("Current User ID:", current_user)  # Debugging line
+        current_user = get_jwt_identity()
+        print("Current User ID:", current_user)
 
         if not current_user:
-            return {"message": "Invalid token or user not found"}, 401  # Return a dictionary, not a Response object
+            return {"message": "Invalid token or user not found"}, 401
 
-        user = UserRetrieval.get_user_from_token(current_user)  # Fetch user details from your data source
+        user = UserRetrieval.get_user_from_token(current_user)
         if user is None:
-            return {"message": "User not found"}, 404  # Return a dictionary, not a Response object
+            return {"message": "User not found"}, 404
 
         user_schema = UserSchema()
-        return user_schema.dump(user)  # This will return a dictionary, which flask_restful will serialize to JSON
+        return user_schema.dump(user)
 
 
 class UserResource(Resource):
@@ -304,15 +250,7 @@ class AdminResource(Resource):
 
 class UsersResource(Resource):
     @jwt_required()
-    def get(self):
-        # Get the identity of the current user
-        current_user = get_jwt_identity()
-        
-        # Optionally, you can check the user's role or any other attribute
-        # For example, if you want to restrict access to admins only
-        # if current_user['role'] != 'admin':
-        #     return {'message': 'Access forbidden: Admins only'}, 403
-        
+    def get(self):      
         # Query all users
         users = User.query.all()
         
@@ -362,19 +300,6 @@ class ArtworkResource(Resource):
         try:
             artwork = Artwork.query.get(id)
             return artwork.to_dict(), 200
-            # if artwork :
-            #     response={
-            #         "id": artwork.id,
-            #         "title": artwork.title,
-            #         "description": artwork.description,
-            #         "price": artwork.price,
-            #         "image": artwork.image,
-            #         "created_at": artwork.created_at,
-            #         "updated_at": artwork.updated_at,
-            #     }
-            #     return make_response(jsonify(response), 200)
-            # else:
-            #     return make_response(jsonify({'error':'artwork not found'}), 404)
                                      
         except Exception as e:
             return {"error": str(e)}, 500
@@ -959,70 +884,6 @@ class AddToCartResource(Resource):
 
         return {'message': 'Artwork added to cart'}, 201
 
-
-# class RemoveFromCartResource(Resource):
-#     @user_required  
-#     def delete(self):
-#         data = request.get_json()
-
-#         user_id = data.get('user_id')
-#         artwork_id = data.get('artwork_id')
-#         if not user_id or not artwork_id:
-#             return {'error': 'User ID and artwork ID are required'}, 400
-
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             return {'error': 'Cart not found'}, 404
-
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-#         if not cart_item:
-#             return {'error': 'Artwork not found in cart'}, 404
-           
-
-#         if cart_item.quantity > 1:
-#             cart_item.quantity -= 1
-#         else:
-#             db.session.delete(cart_item)
-
-#         db.session.commit()
-
-#         return {'message': 'Artwork removed from cart'}, 200
-
-# class RemoveFromCartResource(Resource):
-#     @user_required  
-#     def delete(self):
-#         data = request.get_json()
-
-#         user_id = data.get('user_id')
-#         artwork_id = data.get('artwork_id')
-#         if not user_id or not artwork_id:
-#             return {'error': 'User ID and artwork ID are required'}, 400
-
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             return {'error': 'Cart not found'}, 404
-
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-#         if not cart_item:
-#             return {'error': 'Artwork not found in cart'}, 404
-
-#         if cart_item.quantity > 1:
-#             cart_item.quantity -= 1
-#         else:
-#             db.session.delete(cart_item)
-
-#         db.session.commit()
-
-#         return {'message': 'Artwork removed from cart'}, 200
-
 class RemoveFromCartResource(Resource):
     @user_required  
     def delete(self):
@@ -1080,62 +941,63 @@ class ViewCartResource(Resource):
 
         return {'items': cart_items_list}, 200
     
+@app.route('/messages', methods=['POST'])
+@jwt_required()
+def send_message():
+    data = request.json
+    recipient_id = data.get('recipient_id')
+    message_text = data.get('message')
+    sender_id = get_jwt_identity()
 
-    
-class SendMessageResource(Resource):
-    @jwt_required()
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('recipient_id', type=int, required=True, help="Recipient ID cannot be blank")
-        parser.add_argument('message', type=str, required=True, help="Message content cannot be blank")
-        args = parser.parse_args()
+    if not recipient_id or not message_text:
+        return jsonify({"error": "Invalid data"}), 400
 
-        recipient_id = args['recipient_id']
-        message_content = args['message']
-        sender_id = get_jwt_identity()
+    new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
+    db.session.add(new_message)
+    db.session.commit()
 
-        if not recipient_id or not message_content:
-            return {'error': 'Invalid data'}, 400
+    socketio.emit('new_message', {
+        'sender_id': sender_id,
+        'recipient_id': recipient_id,
+        'content': message_text,
+        'sent_at': new_message.sent_at.isoformat()
+    })
 
-        new_message = Message(
-            sender_id=sender_id,
-            recipient_id=recipient_id,
-            content=message_content
-        )
-        try:
-            Message.query.filter_by(sender_id=recipient_id, recipient_id=sender_id, is_read=False).update({'is_read': True})
-            db.session.add(new_message)
-            db.session.commit()
-        except Exception as e:
-            print(f"Database error: {e}")
-            return {'error': 'Database error'}, 500
+    return jsonify({
+        'id': new_message.id,
+        'sender_id': sender_id,
+        'recipient_id': recipient_id,
+        'content': message_text,
+        'sent_at': new_message.sent_at.isoformat()
+    }), 201
 
-        return {'message': 'Message sent'}, 201
-    
+@app.route('/messages', methods=['GET'])
+@jwt_required()
+def get_messages():
+    user_id = get_jwt_identity()
+    messages = Message.query.filter((Message.sender_id == user_id) | (Message.recipient_id == user_id)).all()
 
-class GetMessagesResource(Resource):
-    @jwt_required()
-    def get(self):
-        user_id = get_jwt_identity()
-        messages = Message.query.filter(
-            (Message.sender_id == user_id) | (Message.recipient_id == user_id)
-        ).all()
+    return jsonify([{
+        'id': msg.id,
+        'sender_id': msg.sender_id,
+        'recipient_id': msg.recipient_id,
+        'content': msg.content,
+        'sent_at': msg.sent_at.isoformat()
+    } for msg in messages])
 
-        try:
-            Message.query.filter_by(recipient_id=user_id, is_read=False).update({'is_read': True})
-            db.session.commit()
-        except Exception as e:
-            print(f"Database error: {e}")
-            return {'error': 'Database error'}, 500
+@socketio.on('message')
+def handle_message(msg):
+    print('Message: ' + msg)
+    send(msg, broadcast=True)
 
-        return jsonify([{
-            'id': msg.id,
-            'sender': msg.sender_id,
-            'recipient': msg.recipient_id,
-            'message': msg.content,
-            'timestamp': msg.timestamp.isoformat(),
-            'is_read': msg.is_read
-        } for msg in messages])
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
 
 class DashboardOverviewResource(Resource):
     @jwt_required()
@@ -1215,8 +1077,6 @@ api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
-api.add_resource(SendMessageResource, '/messages')
-api.add_resource(GetMessagesResource, '/messages')
 api.add_resource(DashboardOverviewResource, '/dashboard')
 api.add_resource(Home, '/')
 api.add_resource(UsersResource, '/users')
