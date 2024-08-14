@@ -5,7 +5,6 @@ from flask import jsonify, make_response, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 booking_parser = reqparse.RequestParser()
-booking_parser.add_argument('user_id', type=int, required=True, help='User ID is required')
 booking_parser.add_argument('event_id', type=int, required=True, help='Event ID is required')
 booking_parser.add_argument('ticket_id', type=int, required=True, help='Ticket ID is required')
 booking_parser.add_argument('status', type=str, required=True, help='Status is required')
@@ -29,13 +28,12 @@ class BookingResource(Resource):
     def post(self):
         current_user = get_jwt_identity()  
         args = booking_parser.parse_args()
-        current_user = get_jwt_identity()
 
         if args['status'] not in ['confirmed', 'pending', 'canceled']:
             return {"error": "Invalid status value"}, 400
 
         new_booking = Booking(
-            user_id=args['user_id'],
+            user_id=current_user,
             event_id=args['event_id'],
             ticket_id=args['ticket_id'],
             status=args['status'],
