@@ -632,7 +632,7 @@ def seed_artworks():
         "artist": "Jan van Eyck",
         "description": "A painting by Jan van Eyck, featuring a double portrait of Giovanni di Nicolao di Arnolfini and his wife.",
         "price": 20000000,
-        "image": "https://i.ibb.co/ZjvTs9J/Arnolfini-Portrait.jpg"
+        "image": "https://i.ibb.co/k6f6JCj/The-Arnolfini-portrait-1434.jpg"
     },
     {
         "title": "Water Lilies",
@@ -730,7 +730,7 @@ def seed_artworks():
         "artist": "Jean-François Millet",
         "description": "An oil painting by Jean-François Millet, depicting three peasant women gleaning a field of stray stalks of wheat after the harvest.",
         "price": 15000000,
-        "image": "https://i.ibb.co/C9DKgcz/The-Gleaners.jpg"
+        "image": "https://i.ibb.co/MMrwBWN/Jean-Fran-ois-Millet-2.jpg"
     },
     {
     "title": "The Card Players",
@@ -744,21 +744,21 @@ def seed_artworks():
     "artist": "Pierre-Auguste Renoir",
     "description": "A painting by French artist Pierre-Auguste Renoir, portraying a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
     "price": 78000000,
-    "image": "https://i.ibb.co/YT68J2v/1200px-Auguste-Renoir-Le-Moulin-de-la-Galette.jpg"
+    "image": "https://i.ibb.co/fdF1sgS/Auguste-Renoir-Dance-at-Le-Moulin-de-la-Galette-Mus-e-d-Orsay-RF-2739-derivative-work-Auto-Contrast.jpg"
 },
 {
     "title": "Venus de Milo",
     "artist": "Alexandros of Antioch",
     "description": "An ancient Greek statue and one of the most famous works of ancient Greek sculpture, attributed to Alexandros of Antioch.",
     "price": 100000000,
-    "image": "https://i.ibb.co/mTdTV0Q/Venus-de-Milo-Louvre-Ma-399-n2.jpg"
+    "image": "https://i.ibb.co/Yk33RG8/V-nus-de-Milo-Mus-e-du-Louvre-AGER-LL-299-N-527-Ma-399-1.jpg"
 },
 {
     "title": "The Thinker",
     "artist": "Auguste Rodin",
     "description": "A bronze sculpture by Auguste Rodin, representing a man in sober meditation battling with a powerful internal struggle.",
     "price": 14000000,
-    "image": "https://i.ibb.co/FwM5Df1/The-Thinker-Auguste-Rodin-1904.jpg"
+    "image": "https://i.ibb.co/L8D4nkQ/The-Thinker.jpg"
 }
 
             

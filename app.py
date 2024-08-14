@@ -360,8 +360,22 @@ class ArtworkResource(Resource):
     @user_required  
     def get(self, id):
         try:
-            artwork = Artwork.query.get_or_404(id)
+            artwork = Artwork.query.get(id)
             return artwork.to_dict(), 200
+            # if artwork :
+            #     response={
+            #         "id": artwork.id,
+            #         "title": artwork.title,
+            #         "description": artwork.description,
+            #         "price": artwork.price,
+            #         "image": artwork.image,
+            #         "created_at": artwork.created_at,
+            #         "updated_at": artwork.updated_at,
+            #     }
+            #     return make_response(jsonify(response), 200)
+            # else:
+            #     return make_response(jsonify({'error':'artwork not found'}), 404)
+                                     
         except Exception as e:
             return {"error": str(e)}, 500
     
@@ -946,37 +960,110 @@ class AddToCartResource(Resource):
         return {'message': 'Artwork added to cart'}, 201
 
 
+# class RemoveFromCartResource(Resource):
+#     @user_required  
+#     def delete(self):
+#         data = request.get_json()
+
+#         user_id = data.get('user_id')
+#         artwork_id = data.get('artwork_id')
+#         if not user_id or not artwork_id:
+#             return {'error': 'User ID and artwork ID are required'}, 400
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             return {'error': 'Cart not found'}, 404
+
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+#         if not cart_item:
+#             return {'error': 'Artwork not found in cart'}, 404
+           
+
+#         if cart_item.quantity > 1:
+#             cart_item.quantity -= 1
+#         else:
+#             db.session.delete(cart_item)
+
+#         db.session.commit()
+
+#         return {'message': 'Artwork removed from cart'}, 200
+
+# class RemoveFromCartResource(Resource):
+#     @user_required  
+#     def delete(self):
+#         data = request.get_json()
+
+#         user_id = data.get('user_id')
+#         artwork_id = data.get('artwork_id')
+#         if not user_id or not artwork_id:
+#             return {'error': 'User ID and artwork ID are required'}, 400
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             return {'error': 'Cart not found'}, 404
+
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+#         if not cart_item:
+#             return {'error': 'Artwork not found in cart'}, 404
+
+#         if cart_item.quantity > 1:
+#             cart_item.quantity -= 1
+#         else:
+#             db.session.delete(cart_item)
+
+#         db.session.commit()
+
+#         return {'message': 'Artwork removed from cart'}, 200
+
 class RemoveFromCartResource(Resource):
     @user_required  
-    def post(self):
+    def delete(self):
         data = request.get_json()
-
+        
+        # Extract user_id and artwork_id from the request data
         user_id = data.get('user_id')
         artwork_id = data.get('artwork_id')
+
+        # Check if user_id and artwork_id are provided
         if not user_id or not artwork_id:
             return {'error': 'User ID and artwork ID are required'}, 400
 
+        # Retrieve the user by user_id
         user = User.query.get(user_id)
         if not user:
             return {'error': 'User not found'}, 404
 
+        # Find the cart associated with the user
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             return {'error': 'Cart not found'}, 404
 
+        # Find the cart item that matches the given artwork_id
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
             return {'error': 'Artwork not found in cart'}, 404
-           
 
+        # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
         if cart_item.quantity > 1:
             cart_item.quantity -= 1
         else:
             db.session.delete(cart_item)
 
+        # Commit the changes to the database
         db.session.commit()
 
         return {'message': 'Artwork removed from cart'}, 200
+
+
+
 
 class ViewCartResource(Resource):
     @user_required
@@ -1117,7 +1204,9 @@ api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
+# api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
+
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
