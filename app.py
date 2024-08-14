@@ -774,7 +774,7 @@ class ArtworkCheckoutResource(Resource):
         
 class ShippingResource(Resource):
     @user_required
-    def get(self, user_id):
+    def get(self, user_ArtworkListResourceid):
       
         shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
         if not shipping_address:
