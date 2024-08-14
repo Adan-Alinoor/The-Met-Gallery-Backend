@@ -883,6 +883,80 @@ class AddToCartResource(Resource):
         db.session.commit()
 
         return {'message': 'Artwork added to cart'}, 201
+    
+# class UpdateCartItemResource(Resource):
+#     def post(self):
+#         data = request.get_json()
+        
+#         user_id = data.get('user_id')
+#         if not user_id:
+#             return {'error': 'User ID is required'}, 400
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             return {'error': 'Cart not found for user'}, 404
+
+#         artwork = Artwork.query.get(data['artwork_id'])
+#         if not artwork:
+#             return {'error': 'Artwork not found'}, 404
+
+#         new_quantity = data.get('quantity')
+#         if new_quantity <= 0:
+#             return {'error': 'Invalid quantity'}, 400
+
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+#         if not cart_item:
+#             return {'error': 'Cart item not found'}, 404
+
+#         cart_item.quantity = new_quantity
+
+#         db.session.commit()
+
+#         return {'message': 'Cart item updated successfully'}, 200    
+class UpdateCartItemResource(Resource):
+    def post(self):
+        data = request.get_json()
+        
+        user_id = data.get('user_id')
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        cart = Cart.query.filter_by(user_id=user.id).first()
+        if not cart:
+            return {'error': 'Cart not found for user'}, 404
+
+        artwork = Artwork.query.get(data['artwork_id'])
+        if not artwork:
+            return {'error': 'Artwork not found'}, 404
+
+        new_quantity = data.get('quantity')
+        if new_quantity <= 0:
+            return {'error': 'Invalid quantity'}, 400
+
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+        if not cart_item:
+            return {'error': 'Cart item not found'}, 404
+
+        try:
+            # Use a transaction to ensure data consistency
+            with db.session.begin(subtransactions=True):
+                cart_item.quantity = new_quantity
+                db.session.commit()
+
+            return {'message': 'Cart item updated successfully'}, 200
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'Error updating cart item: {e}')
+            return {'error': 'Failed to update cart item'}, 500
+
 
 class RemoveFromCartResource(Resource):
     @user_required  
@@ -1046,6 +1120,8 @@ class DashboardOverviewResource(Resource):
         }
 
         return jsonify(response)
+    
+    
 
 
 from Resources.event import EventsResource
@@ -1066,7 +1142,7 @@ api.add_resource(EventsResource, '/events', '/events/<int:id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
-# api.add_resource(RemoveFromCartResource, '/remove_from_cart')
+api.add_resource(UpdateCartItemResource, '/update_cart_item')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
