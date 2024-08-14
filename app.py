@@ -680,7 +680,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://0c8e-102-214-74-3.ngrok-free.app/callback",  
+            "CallBackURL": "https://fcbf-102-214-74-3.ngrok-free.app",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -799,51 +799,51 @@ class ArtworkCheckoutResource(Resource):
             return {'error': 'An error occurred while processing the order'}, 500
 
 
-@app.route('/callback', methods=['POST'])
-def mpesa_callback():
-    data = request.get_json()
+# @app.route('/callback', methods=['POST'])
+# def mpesa_callback():
+#     data = request.get_json()
 
-    checkout_request_id = data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-    result_code = data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
-    result_desc = data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
+#     checkout_request_id = data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+#     result_code = data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
+#     result_desc = data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
 
-    if not data:
-        logging.error("No data received in callback")
-        return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
+#     if not data:
+#         logging.error("No data received in callback")
+#         return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
     
-    secret_key = request.headers.get('X-Callback-Secret')
-    if secret_key != CALLBACK_SECRET:
-        logging.error("Invalid callback secret")
-        return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
+#     secret_key = request.headers.get('X-Callback-Secret')
+#     if secret_key != CALLBACK_SECRET:
+#         logging.error("Invalid callback secret")
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
 
-    try:
-        stk_callback = data['Body']['stkCallback']
-        checkout_request_id = stk_callback['CheckoutRequestID']
-        result_code = stk_callback['ResultCode']
-        result_desc = stk_callback['ResultDesc']
-    except KeyError as e:
-        logging.error(f'Missing key in callback data: {e}')
-        return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
+#     try:
+#         stk_callback = data['Body']['stkCallback']
+#         checkout_request_id = stk_callback['CheckoutRequestID']
+#         result_code = stk_callback['ResultCode']
+#         result_desc = stk_callback['ResultDesc']
+#     except KeyError as e:
+#         logging.error(f'Missing key in callback data: {e}')
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
 
-    # Log the extracted callback data
-    logging.debug(f'CheckoutRequestID: {checkout_request_id}')
-    logging.debug(f'ResultCode: {result_code}')
-    logging.debug(f'ResultDesc: {result_desc}')
+#     # Log the extracted callback data
+#     logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+#     logging.debug(f'ResultCode: {result_code}')
+#     logging.debug(f'ResultDesc: {result_desc}')
 
-    payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
+#     payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
 
-    if payment:
-        if result_code == 0:
-            payment.status = 'complete'
-            payment.transaction_desc = result_desc
-        else:
-            payment.status = 'failed'
-            payment.transaction_desc = result_desc
+#     if payment:
+#         if result_code == 0:
+#             payment.status = 'complete'
+#             payment.transaction_desc = result_desc
+#         else:
+#             payment.status = 'failed'
+#             payment.transaction_desc = result_desc
 
-        db.session.commit()
+#         db.session.commit()
 
 
-    return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+#     return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
 
         
