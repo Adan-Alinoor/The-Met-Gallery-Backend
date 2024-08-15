@@ -276,6 +276,7 @@ class ArtworkListResource(Resource):
     @user_required  
     def post(self):
         data = request.get_json()
+        print("Received data:", data)
         if not data:
             return {"error": "No input data provided"}, 400
         if not all(k in data for k in ("title", "description", "price", "image")):
@@ -292,6 +293,7 @@ class ArtworkListResource(Resource):
             db.session.commit()
             return {"message": "Artwork created", "artwork": new_artwork.to_dict()}, 201
         except Exception as e:
+            print("Error creating artwork:", str(e))
             return {"error": str(e)}, 500
 
 class ArtworkResource(Resource):
@@ -686,7 +688,7 @@ class ArtworkCheckoutResource(Resource):
 
                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
                 if not cart_item or cart_item.quantity < quantity:
-                    return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
+                    return {'error': f'Invalid quantity for artwoview_cartrk ID {artwork_id}'}, 400
 
                 total_amount += cart_item.price * quantity
                 order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
@@ -883,40 +885,7 @@ class AddToCartResource(Resource):
         db.session.commit()
 
         return {'message': 'Artwork added to cart'}, 201
-    
-# class UpdateCartItemResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-        
-#         user_id = data.get('user_id')
-#         if not user_id:
-#             return {'error': 'User ID is required'}, 400
-
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             return {'error': 'Cart not found for user'}, 404
-
-#         artwork = Artwork.query.get(data['artwork_id'])
-#         if not artwork:
-#             return {'error': 'Artwork not found'}, 404
-
-#         new_quantity = data.get('quantity')
-#         if new_quantity <= 0:
-#             return {'error': 'Invalid quantity'}, 400
-
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-#         if not cart_item:
-#             return {'error': 'Cart item not found'}, 404
-
-#         cart_item.quantity = new_quantity
-
-#         db.session.commit()
-
-#         return {'message': 'Cart item updated successfully'}, 200    
+     
 class UpdateCartItemResource(Resource):
     def post(self):
         data = request.get_json()
