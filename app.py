@@ -1007,12 +1007,19 @@ class DashboardOverviewResource(Resource):
         bookings = Booking.query.filter_by(user_id=current_user_id).all()
         notifications = Notification.query.filter_by(user_id=current_user_id).all()
         user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
-        events = Event.query.all()
+        events = Event.query.filter_by(user_id=current_user_id).all()
+
+        event_dict = {event.id: {'title': event.title, 'image': event.image_url} for event in events}
+
+        # Include payments related to bookings or orders created by the user
+        artPayments = Payment.query.join(Booking).filter(Booking.user_id == current_user_id).all()
+        eventPayments = Payment.query.join(Order).filter(Order.user_id == current_user_id).all()
 
         booking_data = [{
             'id': booking.id,
             'user_id': booking.user_id,
             'event_id': booking.event_id,
+            'event_title': event_dict.get(booking.event_id, {}).get('title', 'Unknown Event'),
             'booking_date': booking.created_at.isoformat()
         } for booking in bookings]
 
@@ -1026,10 +1033,30 @@ class DashboardOverviewResource(Resource):
         event_data = [{
             'id': event.id,
             'title': event.title,
-            'description': event.description,
+            'image': event.image_url,
             'start_date': event.start_date.isoformat(),
             'end_date': event.end_date.isoformat()
         } for event in events]
+
+        payment_data = {
+            'art_payments': [{
+                'id': payment.id,
+                'amount': payment.amount,
+                'status': payment.status,
+                'phone_number': payment.phone_number,
+                'payment_type': payment.payment_type,
+                'created_at': payment.created_at.isoformat()
+            } for payment in artPayments],
+            'event_payments': [{
+                'id': payment.id,
+                'amount': payment.amount,
+                'status': payment.status,
+                'phone_number': payment.phone_number,
+                'payment_type': payment.payment_type,
+                'created_at': payment.created_at.isoformat()
+            } for payment in eventPayments]
+        }
+
 
         user_activity_data = [{
             'id': activity.id,
@@ -1042,7 +1069,8 @@ class DashboardOverviewResource(Resource):
             'bookings': booking_data,
             'notifications': notification_data,
             'events': event_data,
-            'user_activities': user_activity_data
+            'user_activities': user_activity_data,
+            'payments': payment_data
         }
 
         return jsonify(response)
@@ -1055,6 +1083,7 @@ from Resources.ticket import MpesaCallbackResource
 from Resources.ticket import EventCheckoutResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
+
     
 # api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
@@ -1062,7 +1091,7 @@ api.add_resource(Logout, '/logout')
 api.add_resource(UserResource, '/user')
 api.add_resource(UserProfile, '/userprofile')
 api.add_resource(AdminResource, '/admin')
-api.add_resource(EventsResource, '/events', '/events/<int:id>')
+api.add_resource(EventsResource, '/events', '/events/<int:id>', '/events/<int:user_id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
@@ -1073,7 +1102,7 @@ api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
 api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
-api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>')
+api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>', '/bookings/<int:user_id>')
 api.add_resource(TicketAdminResource, '/admin/tickets', '/admin/tickets/<int:id>')
 api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
