@@ -1,10 +1,12 @@
 from flask_restful import Resource, reqparse
 from datetime import datetime
-from models import db, Booking, User, Event, Ticket
+from models import db, Booking, Event
 from flask import jsonify, make_response, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import logging
 
 booking_parser = reqparse.RequestParser()
+
 booking_parser.add_argument('event_id', type=int, required=True, help='Event ID is required')
 booking_parser.add_argument('ticket_id', type=int, required=True, help='Ticket ID is required')
 booking_parser.add_argument('status', type=str, required=True, help='Status is required')
@@ -12,18 +14,45 @@ booking_parser.add_argument('status', type=str, required=True, help='Status is r
 class BookingResource(Resource):
     @jwt_required()
     def get(self, id=None):
-        current_user = get_jwt_identity()
+        try:
+            current_user_id = get_jwt_identity()
+            user_specific = request.args.get('user_specific', 'false').lower() == 'true'
+
+            if user_specific:
+                # Fetch bookings for the current user
+                bookings = Booking.query.filter_by(user_id=current_user_id).all()
+            else:
+                if id is None:
+                    # Fetch all bookings
+                    bookings = Booking.query.all()
+                else:
+                    # Fetch a specific booking by ID
+                    booking = Booking.query.get(id)
+                    if booking is None:
+                        return {"error": "Booking not found"}, 404
+                    booking_dict = booking.to_dict()
+                    event = Event.query.get(booking.event_id)
+                    if event:
+                        booking_dict['event'] = event.to_dict()
+                    return jsonify(booking_dict), 200
+
+            # Fetch event details for each booking
+            bookings_with_event_details = []
+            for booking in bookings:
+                event = Event.query.get(booking.event_id)
+                if event:
+                    booking_data = booking.to_dict()
+                    event_data = event.to_dict()
+                    booking_data.update({"event": event_data})
+                    bookings_with_event_details.append(booking_data)
+
+            return jsonify(bookings_with_event_details)
+
+        except Exception as e:
+            logging.error(f"Error fetching bookings: {e}")
+            return {"error": str(e)}, 500
         
-        if id is None:
-            bookings = Booking.query.all()
-            return jsonify([booking.to_dict() for booking in bookings])
-        else:
-           
-            booking = Booking.query.get(id)
-            if booking is None:
-                return {"error": "Booking not found"}, 404
-            return jsonify(booking.to_dict())
-        
+
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()  
@@ -47,7 +76,6 @@ class BookingResource(Resource):
     def patch(self, id):
         current_user = get_jwt_identity()  
         args = request.get_json()
-        current_user = get_jwt_identity()
 
         booking = Booking.query.get(id)
         if booking is None:
