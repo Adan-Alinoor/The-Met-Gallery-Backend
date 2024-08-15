@@ -273,7 +273,7 @@ class ArtworkListResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-    @user_required  
+    @jwt_required()  # Ensure the endpoint is protected by JWT
     def post(self):
         data = request.get_json()
         print("Received data:", data)
@@ -552,24 +552,20 @@ def create_payment(payment_data):
 class ArtworkCheckoutResource(Resource):
     @staticmethod
     def initiate_mpesa_payment(payment_data):
-        
         if not isinstance(payment_data, dict):
             logging.error(f'Expected a dictionary but got: {type(payment_data)}')
             return {'error': 'Invalid payment data format'}, 400
 
         logging.debug(f'Payment data: {payment_data}')
-        
-      
+
         user_id = payment_data.get('user_id')
         order_id = payment_data.get('order_id')
         phone_number = payment_data.get('phone_number')
         amount = payment_data.get('amount')
-        
-      
+
         if not all([user_id, order_id, phone_number, amount]):
             logging.error('Missing required fields in payment data')
             return {'error': 'Missing required fields'}, 400
-
 
         user = User.query.get(user_id)
         if not user:
@@ -662,24 +658,17 @@ class ArtworkCheckoutResource(Resource):
             if not phone_number:
                 return {'error': 'Phone number is required'}, 400
 
-            user = User.query.get(user_id)
-            if not user:
-                return {'error': 'User not found'}, 404
-
-            shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-            if not shipping_address:
-                return {'error': 'Shipping address is required'}, 400
-
-            cart = Cart.query.filter_by(user_id=user.id).first()
-            if not cart or not cart.items:
-                return {'error': 'Cart is empty'}, 400
-
             selected_items = data.get('items', [])
             if not selected_items:
                 return {'error': 'No items selected for checkout'}, 400
 
-            order = Order(user_id=user.id)
-            db.session.add(order)
+            user = User.query.get(user_id)
+            if not user:
+                return {'error': 'User not found'}, 404
+
+            cart = Cart.query.filter_by(user_id=user.id).first()
+            if not cart or not cart.items:
+                return {'error': 'Cart is empty'}, 400
 
             total_amount = 0
             for selected_item in selected_items:
@@ -688,10 +677,30 @@ class ArtworkCheckoutResource(Resource):
 
                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
                 if not cart_item or cart_item.quantity < quantity:
-                    return {'error': f'Invalid quantity for artwoview_cartrk ID {artwork_id}'}, 400
+                    return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
 
                 total_amount += cart_item.price * quantity
-                order_item = OrderItem(order_id=order.id, artwork_id=artwork_id, quantity=quantity, price=cart_item.price)
+
+            # Create the order with the total amount
+            order = Order(user_id=user.id, total_price=total_amount)
+            db.session.add(order)
+            db.session.flush()  # Ensure the order.id is available
+
+            for selected_item in selected_items:
+                artwork_id = selected_item.get('artwork_id')
+                quantity = selected_item.get('quantity', 1)
+
+                cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+
+                order_item = OrderItem(
+                    order_id=order.id,
+                    artwork_id=artwork_id,
+                    quantity=quantity,
+                    price=cart_item.price,
+                    title=cart_item.title,  # Ensure title is passed here
+                    description=cart_item.description,  # Include other fields if necessary
+                    image=cart_item.image  # Include other fields if necessary
+                )
                 db.session.add(order_item)
 
                 if cart_item.quantity > quantity:
@@ -699,7 +708,7 @@ class ArtworkCheckoutResource(Resource):
                 else:
                     db.session.delete(cart_item)
 
-            db.session.commit()  
+            db.session.commit()
 
             payment_data = {
                 'user_id': user.id,
@@ -724,6 +733,10 @@ class ArtworkCheckoutResource(Resource):
             db.session.rollback()
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
+
+
+
+
 
 
 # @app.route('/callback', methods=['POST'])

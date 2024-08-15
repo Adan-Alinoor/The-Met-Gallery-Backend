@@ -172,10 +172,12 @@ class Payment(db.Model, SerializerMixin):
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'))
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'))  # Add this line
     amount = db.Column(db.Integer, nullable=False)
+    transaction_id = db.Column(db.String(50), nullable=True) 
     status = db.Column(db.String, nullable=False)
     phone_number = db.Column(db.String, nullable=False)
     payment_type = db.Column(db.String)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship('User', back_populates='payments')
     order = db.relationship('Order', back_populates='payments')
