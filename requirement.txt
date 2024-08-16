@@ -18,6 +18,7 @@ Flask-RESTful==0.3.10
 Flask-SocketIO==5.3.6
 Flask-SQLAlchemy==3.1.1
 greenlet==3.0.3
+gunicorn==23.0.0
 h11==0.14.0
 idna==3.7
 itsdangerous==2.2.0
