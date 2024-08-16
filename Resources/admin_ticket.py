@@ -21,11 +21,14 @@ class TicketAdminResource(Resource):
     @jwt_required()
     def get(self, id=None):
         if id is None:
-           
-            tickets = Ticket.query.all()
+            # Fetch tickets based on event_id query parameter if provided
+            event_id = request.args.get('event_id', type=int)
+            if event_id:
+                tickets = Ticket.query.filter_by(event_id=event_id).all()
+            else:
+                tickets = Ticket.query.all()
             return jsonify([ticket.to_dict() for ticket in tickets])
         else:
-            
             ticket = Ticket.query.get(id)
             if ticket is None:
                 return {"error": "Ticket not found"}, 404
@@ -34,51 +37,34 @@ class TicketAdminResource(Resource):
     @jwt_required()
     def post(self):
         args = ticket_parser.parse_args()
-        user_id = get_jwt_identity()  
-
-
         ticket = Ticket(
             event_id=args['event_id'],
             type_name=args['type_name'],
             price=args['price'],
             quantity=args['quantity']
         )
-
         db.session.add(ticket)
         db.session.commit()
-
         return make_response(jsonify({'message': 'Ticket added successfully'}), 201)
 
     @jwt_required()
     def put(self, id):
         args = ticket_parser.parse_args()
-        user_id = get_jwt_identity()
-
-       
         ticket = Ticket.query.get(id)
         if ticket is None:
             return {"error": "Ticket not found"}, 404
-
-       
         ticket.event_id = args['event_id']
         ticket.type_name = args['type_name']
         ticket.price = args['price']
         ticket.quantity = args['quantity']
-
-
         db.session.commit()
-
         return make_response(jsonify({'message': 'Ticket updated successfully'}), 200)
 
     @jwt_required()
     def delete(self, id):
-        user_id = get_jwt_identity()  
-
         ticket = Ticket.query.get(id)
         if ticket is None:
             return {"error": "Ticket not found"}, 404
-
         db.session.delete(ticket)
         db.session.commit()
-
         return make_response(jsonify({'message': 'Ticket deleted successfully'}), 200)
