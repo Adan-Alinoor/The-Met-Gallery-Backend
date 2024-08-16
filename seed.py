@@ -213,11 +213,11 @@ def delete_existing_data():
             logging.info("Deleting data from OrderItems...")
             OrderItem.query.delete()
 
-            logging.info("Deleting data from Orders...")
-            Order.query.delete()
-
             logging.info("Deleting data from Payments...")
             Payment.query.delete()
+
+            logging.info("Deleting data from Orders...")
+            Order.query.delete()
 
             logging.info("Deleting data from Bookings...")
             Booking.query.delete()
@@ -228,17 +228,21 @@ def delete_existing_data():
             logging.info("Deleting data from Events...")
             Event.query.delete()
 
+            logging.info("Deleting data from Tickets...")
+            Ticket.query.delete()
+
             logging.info("Deleting data from CartItems...")
             CartItem.query.delete()
 
             logging.info("Deleting data from Carts...")
             Cart.query.delete()
 
+
             logging.info("Deleting data from Artworks...")
             Artwork.query.delete()
 
-            logging.info("Deleting data from Users...")
-            User.query.delete()
+            # logging.info("Deleting data from Users...")
+            # User.query.delete()
 
             logging.info("Deleting data from ShippingAddresses...")
             ShippingAddress.query.delete()
@@ -551,6 +555,7 @@ def seed_events():
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error seeding events: {e}")
+
 
 def seed_artworks():
     with app.app_context():  # Ensure all database operations are within app context

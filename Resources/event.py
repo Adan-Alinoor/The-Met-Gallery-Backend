@@ -24,7 +24,7 @@ class EventsResource(Resource):
 
             if id:
                 # Fetch a specific event by ID for the current user
-                event = Event.query.filter_by(id=id, user_id=current_user_id).first()
+                event = Event.query.filter_by(id=id).first()
                 if event is None:
                     return {"error": "Event not found"}, 404
                 event_dict = event.to_dict()
