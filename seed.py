@@ -557,58 +557,51 @@ def seed_events():
             logging.error(f"Error seeding events: {e}")
 
 
-def seed_tickets():
-    with app.app_context():
-        tickets_data = [
+# def seed_tickets():
+#     with app.app_context():
+#         tickets_data = [
+#             {"event_id": 1, "type_name": "Regular", "price": 50, "quantity": 100},
+#             {"event_id": 1, "type_name": "VIP", "price": 100, "quantity": 50},
+#             {"event_id": 1, "type_name": "VVIP", "price": 200, "quantity": 20},
+#             {"event_id": 2, "type_name": "Regular", "price": 60, "quantity": 12},
+#             {"event_id": 2, "type_name": "VIP", "price": 120, "quantity": 6},
+#             {"event_id": 2, "type_name": "VVIP", "price": 250, "quantity": 15},
+#             {"event_id": 3, "type_name": "Regular", "price": 55, "quantity": 110},
+#             {"event_id": 3, "type_name": "VIP", "price": 110, "quantity": 55},
+#             {"event_id": 3, "type_name": "VVIP", "price": 220, "quantity": 25},
+#             {"event_id": 4, "type_name": "Regular", "price": 70, "quantity": 1},
+#             {"event_id": 4, "type_name": "VIP", "price": 140, "quantity": 234},
+#             {"event_id": 4, "type_name": "VVIP", "price": 300, "quantity": 10},
+#             {"event_id": 5, "type_name": "Regular", "price": 45, "quantity": 23},
+#             {"event_id": 5, "type_name": "VIP", "price": 90, "quantity": 456},
+#             {"event_id": 5, "type_name": "VVIP", "price": 180, "quantity": 30},
+#             {"event_id": 6, "type_name": "Regular", "price": 65, "quantity": 566},
+#             {"event_id": 6, "type_name": "VIP", "price": 130, "quantity": 123},
+#             {"event_id": 6, "type_name": "VVIP", "price": 270, "quantity": 18},
+#             {"event_id": 7, "type_name": "Regular", "price": 50, "quantity": 567},
+#             {"event_id": 7, "type_name": "VIP", "price": 100, "quantity": 56},
+#             {"event_id": 7, "type_name": "VVIP", "price": 200, "quantity": 25},
+#             {"event_id": 8, "type_name": "Regular", "price": 60, "quantity": 17},
+#             {"event_id": 8, "type_name": "VIP", "price": 120, "quantity": 567},
+#             {"event_id": 8, "type_name": "VVIP", "price": 240, "quantity": 12}
+#         ]
 
-            {"event_id": 1, "type_name": "Regular", "price": 50, "quantity": 100}
-            {"event_id": 1, "type_name": "VIP", "price": 100, "quantity": 50}
-            {"event_id": 1, "type_name": "VVIP", "price": 200, "quantity": 20},
+#         logging.info("Seeding tickets...")
+#         try:
+#             for ticket_data in tickets_data:
+#                 ticket = Ticket(
+#                     event_id=ticket_data["event_id"],
+#                     type_name=ticket_data["type_name"],
+#                     price=ticket_data["price"],
+#                     quantity=ticket_data["quantity"]
+#                 )
+#                 db.session.add(ticket)
+#             db.session.commit()
+#             logging.info("Tickets seeded.")
+#         except Exception as e:
+#             db.session.rollback()
+#             logging.error(f"Error seeding tickets: {e}")
 
-            {"event_id": 2, "type_name": "Regular", "price": 60, "quantity": 12},
-            {"event_id": 2, "type_name": "VIP", "price": 120, "quantity": 6},
-            {"event_id": 2, "type_name": "VVIP", "price": 250, "quantity": 15},
-
-            {"event_id": 3, "type_name": "Regular", "price": 55, "quantity": 110},
-            {"event_id": 3, "type_name": "VIP", "price": 110, "quantity": 55},
-            {"event_id": 3, "type_name": "VVIP", "price": 220, "quantity": 25},
-
-            {"event_id": 4, "type_name": "Regular", "price": 70, "quantity": 1},
-            {"event_id": 4, "type_name": "VIP", "price": 140, "quantity": 234},
-            {"event_id": 4, "type_name": "VVIP", "price": 300, "quantity": 10},
-            
-            {"event_id": 5, "type_name": "Regular", "price": 45, "quantity": 23},
-            {"event_id": 5, "type_name": "VIP", "price": 90, "quantity": 456},
-            {"event_id": 5, "type_name": "VVIP", "price": 180, "quantity": 30},
-
-            {"event_id": 6, "type_name": "Regular", "price": 65, "quantity": 566},
-            {"event_id": 6, "type_name": "VIP", "price": 130, "quantity":123},
-            {"event_id": 6, "type_name": "VVIP", "price": 270, "quantity": 18},
-
-            {"event_id": 7, "type_name": "Regular", "price": 50, "quantity":567}, 
-            {"event_id": 7, "type_name": "VIP", "price": 100, "quantity": 56},
-            {"event_id": 7, "type_name": "VVIP", "price": 200, "quantity": 25},
-
-            {"event_id": 8, "type_name": "Regular", "price": 60, "quantity": 17},
-            {"event_id": 8, "type_name": "VIP", "price": 120, "quantity": 567},
-            {"event_id": 8, "type_name": "VVIP", "price": 240, "quantity": 12}
-        ]
-
-     logging.info("Seeding tickets...")
-        try:
-            for tickets_data in tickets_data:
-                ticket = Ticket(
-                    title=tickets_data["title"],
-                    description=tickets_data["description"],
-                    price=tickets_data["price"],
-                    image=tickets_data["image"]
-                )
-                db.session.add(ticket)
-            db.session.commit()
-            logging.info("Tickets seeded.")
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error seeding tickets: {e}")
 
 def seed_artworks():
     with app.app_context():  # Ensure all database operations are within app context
@@ -864,4 +857,4 @@ if __name__ == "__main__":
         seed_users()
         seed_events()
         seed_artworks()
-        # seed_tickets()
+        #seed_tickets()
