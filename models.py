@@ -41,6 +41,10 @@ class User(db.Model, SerializerMixin, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)  
     is_seller = db.Column(db.Boolean, default=False)
+    email_confirmed = db.Column(db.Boolean)
+
+    
+    
 
     cart = db.relationship('Cart', back_populates='user', uselist=False)
     payments = db.relationship('Payment', back_populates='user')
