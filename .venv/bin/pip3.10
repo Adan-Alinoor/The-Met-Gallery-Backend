@@ -1,4 +1,4 @@
-#!/Users/admin/Desktop/The-Met-Gallery-Backend/.venv/bin/python
+#!/home/adan/documents/development/phase-4/The-Met-Gallery-Backend/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

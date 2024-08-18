@@ -8,6 +8,10 @@ from datetime import datetime,timedelta
 from marshmallow import Schema, fields
 from flask_jwt_extended import decode_token
 from flask_marshmallow import Marshmallow
+#
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+from itsdangerous import BadSignature, SignatureExpired
 
 import os
 from flask import Flask, request, jsonify
@@ -43,6 +47,17 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+#
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'zizkoteam@gmail.com'
+app.config['MAIL_PASSWORD'] = 'xuog xbgx togb uspq'
+app.config['MAIL_DEFAULT_SENDER'] = 'zizkoteam@gmail.com'
+
+mail = Mail(app)
+s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
 ma = Marshmallow(app)
 
 migrate = Migrate(app, db)
@@ -51,62 +66,133 @@ jwt = JWTManager(app)
 api = Api(app)
 CORS(app)
 
-class Signup(Resource):
-    @jwt_required()
-    def get(self):
-        current_user = get_jwt_identity()
-        users = User.query.all()
-        users_list = [user.to_dict() for user in users]
-        return make_response({"count": len(users_list), "users": users_list}, 200)
 
+class Signup(Resource):
     def post(self):
-        email = User.query.filter_by(email=request.json.get('email')).first()
-        if email:
+        data = request.json
+
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=data.get('email')).first()
+        if existing_user:
             return make_response({"message": "Email already taken"}, 422)
 
-        # Fetch the role and is_admin values from the request
-        role = request.json.get("role", "user")
-        is_admin = request.json.get("is_admin", False)
+        try:
+            # Create new user
+            new_user = User(
+                username=data.get('username'),
+                email=data.get('email'),
+                password=generate_password_hash(data.get('password')),
+                role=data.get('role', 'user'),
+                is_admin=data.get('is_admin', False),
+                email_confirmed=False  # Set email_confirmed to False initially
+            )
 
-        # If is_admin is True, override the role to 'admin'
-        if is_admin:
-            role = "admin"
+            # Add new user to the database
+            db.session.add(new_user)
+            db.session.commit()
 
-        new_user = User(
-            username=request.json.get("username"),
-            email=request.json.get("email"),
-            password=generate_password_hash(request.json.get("password")),
-            role=role,
-            is_admin=is_admin
-        )
+            # Generate email confirmation token
+            token = s.dumps(new_user.email, salt='email-confirmation')
+            verify_url = f"http://localhost:5555/verify/{token}"
 
-        db.session.add(new_user)
+            # Prepare confirmation email
+            msg = Message("Please confirm your email", recipients=[new_user.email])
+            msg.body = f"Thanks for signing up! Please confirm your email by clicking on the link: {verify_url}"
+
+            # Send confirmation email
+            try:
+                mail.send(msg)
+                print(f"Email sent successfully to {new_user.email} with token {token}")
+            except Exception as e:
+                print(f"Failed to send email: {e}")
+                db.session.rollback()
+                return make_response({"message": "Error sending confirmation email. Please try again later."}, 500)
+
+            return make_response({
+                "message": "User has been created successfully, please check your email to verify your account."
+            }, 201)
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error during registration: {e}")
+            return make_response({"message": "Error during registration. Please try again later."}, 500)
+
+        
+        
+
+
+class VerifyEmail(Resource):
+    def get(self, token):
+        try:
+            email = s.loads(token, salt='email-confirmation', max_age=3600)  # Token expires after 1 hour
+        except SignatureExpired:
+            return make_response({"message": "The token has expired."}, 400)
+        except BadSignature:
+            return make_response({"message": "Invalid token."}, 400)
+
+        user = User.query.filter_by(email=email).first_or_404()
+
+        if user.email_confirmed:
+            return make_response({"message": "Account already verified."}, 400)
+
+        user.email_confirmed = True
         db.session.commit()
+        return make_response({"message": "Your account has been verified. You can now log in."}, 200)
 
-        access_token = create_access_token(identity=new_user.id)
-        return make_response({
-            "user": new_user.to_dict(),
-            "access_token": access_token,
-            "success": True,
-            "message": "User has been created successfully"
-        }, 201)
+    
+
+class TestEmail(Resource):
+    def get(self):
+        try:
+            # Create a test email message
+            msg = Message("Test Email", recipients=["your_email@example.com"])
+            msg.body = "This is a test email."
+            # Send the email
+            mail.send(msg)
+            return make_response("Email sent successfully!", 200)
+        except Exception as e:
+            print(f"Error sending email: {e}")
+            return "Failed to send email."
+            
+                
+
 
 class Login(Resource):
     def post(self):
-        email = request.json.get('email')
-        password = request.json.get('password')
+        # Get email and password from the request
+        data = request.json
+        email = data.get('email')
+        password = data.get('password')
+        
+        # Query for the user by email
         user = User.query.filter_by(email=email).first()
+        
+        # Check if the user exists and if the password is correct
+        if not user or not check_password_hash(user.password, password):
+            return make_response({"message": "Invalid email or password."}, 401)
 
-        if user and check_password_hash(user.password, password):
-            access_token = create_access_token(identity=user.id)
-            return make_response({
-                "user": user.to_dict(),
-                "is_admin": user.is_admin,
-                "access_token": access_token,
-                "success": True,
-                "message": "Login successful"
-            }, 200)
-        return make_response({"message": "Invalid credentials"}, 401)
+        # Check if the user is verified
+        if not user.email_confirmed:  # Updated field
+            return make_response({"message": "Please verify your email before logging in."}, 403)
+
+        # Generate an access token
+        access_token = create_access_token(identity=user.id)
+        
+        # Return a success response with user data and token
+        return make_response({
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "is_admin": user.is_admin
+            },
+            "access_token": access_token,
+            "success": True,
+            "message": "Login successful"
+        }, 200)
+
+
     
 class VerifyToken(Resource):
     @jwt_required()
@@ -1170,6 +1256,8 @@ api.add_resource(UsersResource, '/users')
 api.add_resource(Signup, '/signup')
 # api.add_resource(Login, '/login')
 api.add_resource(VerifyToken, '/verify-token')
+api.add_resource(TestEmail, '/test-email')
+api.add_resource(VerifyEmail, '/verify/<string:token>')
 
 logging.basicConfig(level=logging.DEBUG)
 
