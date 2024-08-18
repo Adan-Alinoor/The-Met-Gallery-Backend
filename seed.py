@@ -119,7 +119,7 @@ def create_tickets(events):
 def seed_data():
     with app.app_context():
         # Clear existing data
-        db.session.execute(text('TRUNCATE TABLE users, events, artworks, tickets RESTART IDENTITY CASCADE'))
+        db.session.execute(text('TRUNCATE TABLE events, artworks, tickets RESTART IDENTITY CASCADE'))
         db.session.commit()
 
         # Create and add data
