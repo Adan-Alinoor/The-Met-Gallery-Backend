@@ -32,7 +32,8 @@ from Resources.admin_ticket import TicketAdminResource
 from flask_socketio import SocketIO, send, emit
 
 
-
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("EXTERNAL_DATABASE_URL")
@@ -190,6 +191,22 @@ class UserProfile(Resource):
         return user_schema.dump(user)
 
 
+class UsersResource(Resource):
+    @jwt_required()
+    def get(self):      
+        # Query all users
+        users = User.query.all()
+        
+        # Return user data
+        return jsonify([{
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at
+        } for user in users])
+
+
 class UserResource(Resource):
     @jwt_required()
     def get(self):
@@ -247,22 +264,6 @@ class AdminResource(Resource):
     @admin_required
     def get(self):
         return {'message': 'Admin content accessible'}
-
-class UsersResource(Resource):
-    @jwt_required()
-    def get(self):      
-        # Query all users
-        users = User.query.all()
-        
-        # Return user data
-        return jsonify([{
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'role': user.role,
-            'created_at': user.created_at
-        } for user in users])
-
 
 class ArtworkListResource(Resource):
     @jwt_required()
@@ -332,7 +333,21 @@ class ArtworkResource(Resource):
             return {"message": "Artwork deleted"}, 200
         except Exception as e:
             return {"error": str(e)}, 500
-
+        
+class ArtworkByOrderResource(Resource):
+    @user_required  
+    def get(self, order_id):
+        try:
+            order = Order.query.get(order_id)
+            if order is None:
+                return {"error": "Order not found"}, 404
+            artworks = []
+            for item in order.items:
+                artwork = item.artwork
+                artworks.append(artwork.to_dict())
+            return artworks, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
 
 
 class AddToCartResource(Resource):
@@ -1060,14 +1075,23 @@ class DashboardOverviewResource(Resource):
     def get(self):
         current_user_id = get_jwt_identity()
 
+        # Fetch data
         bookings = Booking.query.filter_by(user_id=current_user_id).all()
         notifications = Notification.query.filter_by(user_id=current_user_id).all()
         user_activities = UserActivity.query.filter_by(user_id=current_user_id).all()
         events = Event.query.filter_by(user_id=current_user_id).all()
+        
+        # Additional data
+        artworks_count = Artwork.query.count()
+        users_count = User.query.count()
+        events_count = Event.query.count()
 
+        # Recent transactions
+        recent_transactions = Payment.query.order_by(Payment.created_at.desc()).all()
+
+        # Prepare data for response
         event_dict = {event.id: {'title': event.title, 'image': event.image_url} for event in events}
 
-        # Include payments related to bookings or orders created by the user
         artPayments = Payment.query.join(Booking).filter(Booking.user_id == current_user_id).all()
         eventPayments = Payment.query.join(Order).filter(Order.user_id == current_user_id).all()
 
@@ -1113,24 +1137,33 @@ class DashboardOverviewResource(Resource):
             } for payment in eventPayments]
         }
 
-
         user_activity_data = [{
             'id': activity.id,
             'user_id': activity.user_id,
+            'username': User.query.get(activity.user_id).username,  # Fetch username
             'activity_type': activity.activity_type,
+            'description': activity.description,
             'timestamp': activity.timestamp.isoformat()
         } for activity in user_activities]
 
+        # Format recent transactions
+        recent_transactions_data = [{
+            'id': transaction.id,
+            'amount': transaction.amount,
+            'status': transaction.status,
+            'created_at': transaction.created_at.isoformat()
+        } for transaction in recent_transactions]
+
         response = {
-            'bookings': booking_data,
-            'notifications': notification_data,
-            'events': event_data,
-            'user_activities': user_activity_data,
-            'payments': payment_data
+            'artworks_count': artworks_count,
+            'events_count': events_count,
+            'users_count': users_count,
+            'recent_transactions': recent_transactions_data,
+            'recent_activity': user_activity_data,
         }
 
         return jsonify(response)
-    
+
     
 
 
@@ -1141,6 +1174,8 @@ from Resources.ticket import MpesaCallbackResource
 from Resources.ticket import EventCheckoutResource
 from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
+# from Resources.payment import PaymentSearchResource
+from Resources.payment import PaymentResource
 
     
 # api.add_resource(Signup, '/signup')
@@ -1155,6 +1190,10 @@ api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(UpdateCartItemResource, '/update_cart_item')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
+
+api.add_resource(PaymentResource, '/payments')
+# api.add_resource(PaymentSearchResource, '/payments/search')
+api.add_resource(ArtworkByOrderResource, '/artworks/order/<int:order_id>')
 
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
 api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
