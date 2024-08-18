@@ -187,7 +187,20 @@ class Payment(db.Model, SerializerMixin):
     order = db.relationship('Order', back_populates='payments')
     booking = db.relationship('Booking', back_populates='payments')  # Add this line
 
-    serialize_only = ('id', 'user_id', 'order_id', 'booking_id', 'amount', 'status', 'created_at')
+    def serialize(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'order_id': self.order_id,
+            'booking_id': self.booking_id,
+            'amount': self.amount,
+            'transaction_id': self.transaction_id,
+            'status': self.status,
+            'phone_number': self.phone_number,
+            'payment_type': self.payment_type,
+            'created_at': self.created_at.isoformat(), 
+            'updated_at': self.updated_at.isoformat(), 
+        }
 
 
 class ShippingAddress(db.Model, SerializerMixin):

@@ -4,7 +4,7 @@ from datetime import datetime
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
 
-from models import db, Event, Ticket, User
+from models import db, Event, Ticket, User, UserActivity
 
 event_parser = reqparse.RequestParser()
 event_parser.add_argument('title', type=str, required=True, help='Title is required')
@@ -83,7 +83,6 @@ class EventsResource(Resource):
         event.title = args['title']
         event.image_url = args['image_url']
         event.description = args['description']
-        event.user_id = current_user_id
         event.location = args['location']
 
         db.session.commit()
