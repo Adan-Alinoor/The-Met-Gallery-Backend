@@ -1251,8 +1251,6 @@ class DashboardOverviewResource(Resource):
         return jsonify(response)
 
     
-
-
 from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.ticket import TicketResource
