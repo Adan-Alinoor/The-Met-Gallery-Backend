@@ -38,14 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-<<<<<<< HEAD
 VIRTUAL_ENV="/home/adan/documents/development/phase-4/The-Met-Gallery-Backend/.venv"
-=======
-VIRTUAL_ENV='/Users/admin/Desktop/The-Met-Gallery-Backend/.venv'
-if ([ "$OSTYPE" = "cygwin" ] || [ "$OSTYPE" = "msys" ]) && $(command -v cygpath &> /dev/null) ; then
-    VIRTUAL_ENV=$(cygpath -u "$VIRTUAL_ENV")
-fi
->>>>>>> 958fd02a4c6b8b8585cdee572ca4b15745e67f0f
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
@@ -68,23 +61,9 @@ if [ -z "${VIRTUAL_ENV_DISABLE_PROMPT:-}" ] ; then
     export VIRTUAL_ENV_PROMPT
 fi
 
-<<<<<<< HEAD
 # This should detect bash and zsh, which have a hash command that must
 # be called to get it to forget past commands.  Without forgetting
 # past commands the $PATH changes we made may not be respected
 if [ -n "${BASH:-}" -o -n "${ZSH_VERSION:-}" ] ; then
     hash -r 2> /dev/null
 fi
-=======
-# Make sure to unalias pydoc if it's already there
-alias pydoc 2>/dev/null >/dev/null && unalias pydoc || true
-
-pydoc () {
-    python -m pydoc "$@"
-}
-
-# The hash command must be called to get it to forget past
-# commands. Without forgetting past commands the $PATH changes
-# we made may not be respected
-hash -r 2>/dev/null || true
->>>>>>> 958fd02a4c6b8b8585cdee572ca4b15745e67f0f

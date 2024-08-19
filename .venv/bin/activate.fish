@@ -33,22 +33,10 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-<<<<<<< HEAD
 set -gx VIRTUAL_ENV "/home/adan/documents/development/phase-4/The-Met-Gallery-Backend/.venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
-=======
-set -gx VIRTUAL_ENV '/Users/admin/Desktop/The-Met-Gallery-Backend/.venv'
-
-# https://github.com/fish-shell/fish-shell/issues/436 altered PATH handling
-if test (echo $FISH_VERSION | head -c 1) -lt 3
-    set -gx _OLD_VIRTUAL_PATH (_bashify_path $PATH)
-else
-    set -gx _OLD_VIRTUAL_PATH $PATH
-end
-set -gx PATH "$VIRTUAL_ENV"'/bin' $PATH
->>>>>>> 958fd02a4c6b8b8585cdee572ca4b15745e67f0f
 
 # Unset PYTHONHOME if set.
 if set -q PYTHONHOME
