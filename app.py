@@ -68,6 +68,7 @@ api = Api(app)
 CORS(app)
 
 
+
 class Signup(Resource):
     def post(self):
         data = request.json
@@ -140,6 +141,7 @@ class VerifyEmail(Resource):
         db.session.commit()
         return make_response({"message": "Your account has been verified. You can now log in."}, 200)
 
+
     
 
 class TestEmail(Resource):
@@ -156,7 +158,6 @@ class TestEmail(Resource):
             return "Failed to send email."
             
                 
-
 
 class Login(Resource):
     def post(self):
@@ -192,6 +193,7 @@ class Login(Resource):
             "success": True,
             "message": "Login successful"
         }, 200)
+
 
 
     
