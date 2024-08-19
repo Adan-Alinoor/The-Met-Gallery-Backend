@@ -68,6 +68,7 @@ api = Api(app)
 CORS(app)
 
 
+
 class Signup(Resource):
     def post(self):
         data = request.json
@@ -165,7 +166,6 @@ class TestEmail(Resource):
             
                 
 
-
 class Login(Resource):
     def post(self):
         # Get email and password from the request
@@ -200,6 +200,7 @@ class Login(Resource):
             "success": True,
             "message": "Login successful"
         }, 200)
+
 
 
     
