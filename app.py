@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("EXTERNAL_DATABASE_URL")
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -103,10 +103,10 @@ class Signup(Resource):
             # Send confirmation email
             try:
                 mail.send(msg)
-                print(f"Email sent successfully to {new_user.email} with token {token}")
+                logging.info(f"Email sent successfully to {new_user.email} with token {token}")
             except Exception as e:
-                print(f"Failed to send email: {e}")
-                db.session.rollback()
+                logging.error(f"Failed to send email: {e}")
+                db.session.rollback()  # Rollback the transaction if email fails
                 return make_response({"message": "Error sending confirmation email. Please try again later."}, 500)
 
             return make_response({
@@ -114,8 +114,8 @@ class Signup(Resource):
             }, 201)
 
         except Exception as e:
-            db.session.rollback()
-            print(f"Error during registration: {e}")
+            db.session.rollback()  # Rollback in case of any errors
+            logging.error(f"Error during registration: {e}")
             return make_response({"message": "Error during registration. Please try again later."}, 500)
 
         
@@ -127,18 +127,26 @@ class VerifyEmail(Resource):
         try:
             email = s.loads(token, salt='email-confirmation', max_age=3600)  # Token expires after 1 hour
         except SignatureExpired:
-            return make_response({"message": "The token has expired."}, 400)
+            logging.warning("Verification token expired.")
+            return make_response({"message": "The token has expired. Please request a new verification email."}, 400)
         except BadSignature:
-            return make_response({"message": "Invalid token."}, 400)
+            logging.warning("Invalid verification token.")
+            return make_response({"message": "Invalid token. Please request a new verification email."}, 400)
 
-        user = User.query.filter_by(email=email).first_or_404()
+        user = User.query.filter_by(email=email).first()
+        if user is None:
+            logging.warning(f"User with email {email} not found.")
+            return make_response({"message": "User not found."}, 404)
 
         if user.email_confirmed:
-            return make_response({"message": "Account already verified."}, 400)
+            return make_response({"message": "Account already verified."}, 200)
 
         user.email_confirmed = True
         db.session.commit()
+
+        logging.info(f"User with email {email} has been successfully verified.")
         return make_response({"message": "Your account has been verified. You can now log in."}, 200)
+
 
     
 
