@@ -1,14 +1,14 @@
 from flask import Flask, request, jsonify, make_response
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
-from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, ShippingAddress, Message, Notification, Event, UserActivity, Booking
+from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, Message, Notification, Event, UserActivity, Booking
 import bcrypt
 import base64
 from datetime import datetime,timedelta
 from marshmallow import Schema, fields
 from flask_jwt_extended import decode_token
 from flask_marshmallow import Marshmallow
-#
+
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from itsdangerous import BadSignature, SignatureExpired
@@ -351,7 +351,7 @@ class UsersResource(Resource):
 
 
 class ArtworkListResource(Resource):
-    @jwt_required()
+   
     def get(self):
         try:
             artworks = Artwork.query.all()
@@ -359,7 +359,8 @@ class ArtworkListResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-    @jwt_required()  # Ensure the endpoint is protected by JWT
+      # Ensure the endpoint is protected by JWT
+    @user_required
     def post(self):
         data = request.get_json()
         print("Received data:", data)
@@ -383,7 +384,7 @@ class ArtworkListResource(Resource):
             return {"error": str(e)}, 500
 
 class ArtworkResource(Resource):
-    @user_required  
+   
     def get(self, id):
         try:
             artwork = Artwork.query.get(id)
@@ -516,7 +517,6 @@ class ViewCartResource(Resource):
         
         cart_items_list = [item.to_dict() for item in cart_items]
         return {'items': cart_items_list}, 200
-
 
 
 
@@ -873,117 +873,56 @@ class ArtworkCheckoutResource(Resource):
 
 
         
-class ShippingResource(Resource):
-    @user_required
-    def get(self, user_ArtworkListResourceid):
-      
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if not shipping_address:
-            return {"error": "Shipping address not found"}, 404
-
-        return shipping_address.to_dict(), 200
-
-    @user_required
-    def post(self):
-        data = request.get_json()
-
-        user_id = data.get('user_id')
-        address = data.get('address')
-        city = data.get('city')
-        country = data.get('country')
-        phone = data.get('phone')
-        full_name = data.get('full_name')
-        email = data.get('email')
-
-        if not all([user_id, address, city, country, phone, full_name, email]):
-            return {'error': 'All fields are required'}, 400
-
-       
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if shipping_address:
-            return {'error': 'Shipping address already exists for this user'}, 400
-
-        new_address = ShippingAddress(
-            user_id=user_id,
-            address=address,
-            city=city,
-            country=country,
-            phone=phone,
-            full_name=full_name,
-            email=email
-        )
-
-        db.session.add(new_address)
-        db.session.commit()
-
-        return {'message': 'Shipping address created successfully', 'address': new_address.to_dict()}, 201
-
-    @user_required
-    def put(self, user_id):
-        data = request.get_json()
-        shipping_address = ShippingAddress.query.filter_by(user_id=user_id).first()
-        if not shipping_address:
-            return {'error': 'Shipping address not found'}, 404
-
-        shipping_address.address = data.get('address', shipping_address.address)
-        shipping_address.city = data.get('city', shipping_address.city)
-        shipping_address.country = data.get('country', shipping_address.country)
-        shipping_address.phone = data.get('phone', shipping_address.phone)
-        shipping_address.full_name = data.get('full_name', shipping_address.full_name)
-        shipping_address.email = data.get('email', shipping_address.email)
-
-        db.session.commit()
-
-        return {'message': 'Shipping address updated successfully', 'address': shipping_address.to_dict()}, 200
 
 
-class AddToCartResource(Resource):
-    def post(self):
-        data = request.get_json()
+
+# class AddToCartResource(Resource):
+#     def post(self):
+#         data = request.get_json()
 
         
-        user_id = data.get('user_id') 
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+#         user_id = data.get('user_id') 
+#         if not user_id:
+#             return {'error': 'User ID is required'}, 400
 
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            cart = Cart(user_id=user.id)
-            db.session.add(cart)
-            db.session.commit()
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
 
         
-        artwork = Artwork.query.get(data['artwork_id'])
-        if not artwork:
-            return {'error': 'artwork not found'}, 404
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             cart = Cart(user_id=user.id)
+#             db.session.add(cart)
+#             db.session.commit()
 
         
-        quantity = data.get('quantity', 1)  
+#         artwork = Artwork.query.get(data['artwork_id'])
+#         if not artwork:
+#             return {'error': 'artwork not found'}, 404
+
         
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-        if cart_item:
-            cart_item.quantity += quantity  
-        else:
+#         quantity = data.get('quantity', 1)  
+        
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+#         if cart_item:
+#             cart_item.quantity += quantity  
+#         else:
             
-            cart_item = CartItem(
-                cart_id=cart.id,
-                artwork_id=artwork.id,
-                quantity=quantity, 
-                title = artwork.title,
-                description=artwork.description,
-                price=artwork.price,
-                image=artwork.image
-            )
-            db.session.add(cart_item)
+#             cart_item = CartItem(
+#                 cart_id=cart.id,
+#                 artwork_id=artwork.id,
+#                 quantity=quantity, 
+#                 title = artwork.title,
+#                 description=artwork.description,
+#                 price=artwork.price,
+#                 image=artwork.image
+#             )
+#             db.session.add(cart_item)
 
-        db.session.commit()
+#         db.session.commit()
 
-        return {'message': 'Artwork added to cart'}, 201
+#         return {'message': 'Artwork added to cart'}, 201
      
 class UpdateCartItemResource(Resource):
     def post(self):
@@ -1026,62 +965,62 @@ class UpdateCartItemResource(Resource):
             return {'error': 'Failed to update cart item'}, 500
 
 
-class RemoveFromCartResource(Resource):
-    @user_required  
-    def delete(self):
-        data = request.get_json()
+# class RemoveFromCartResource(Resource):
+   
+#     def delete(self):
+#         data = request.get_json()
         
-        # Extract user_id and artwork_id from the request data
-        user_id = data.get('user_id')
-        artwork_id = data.get('artwork_id')
+#         # Extract user_id and artwork_id from the request data
+#         user_id = data.get('user_id')
+#         artwork_id = data.get('artwork_id')
 
-        # Check if user_id and artwork_id are provided
-        if not user_id or not artwork_id:
-            return {'error': 'User ID and artwork ID are required'}, 400
+#         # Check if user_id and artwork_id are provided
+#         if not user_id or not artwork_id:
+#             return {'error': 'User ID and artwork ID are required'}, 400
 
-        # Retrieve the user by user_id
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
+#         # Retrieve the user by user_id
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
 
-        # Find the cart associated with the user
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            return {'error': 'Cart not found'}, 404
+#         # Find the cart associated with the user
+#         cart = Cart.query.filter_by(user_id=user.id).first()
+#         if not cart:
+#             return {'error': 'Cart not found'}, 404
 
-        # Find the cart item that matches the given artwork_id
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-        if not cart_item:
-            return {'error': 'Artwork not found in cart'}, 404
+#         # Find the cart item that matches the given artwork_id
+#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+#         if not cart_item:
+#             return {'error': 'Artwork not found in cart'}, 404
 
-        # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
-        if cart_item.quantity > 1:
-            cart_item.quantity -= 1
-        else:
-            db.session.delete(cart_item)
+#         # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
+#         if cart_item.quantity > 1:
+#             cart_item.quantity -= 1
+#         else:
+#             db.session.delete(cart_item)
 
-        # Commit the changes to the database
-        db.session.commit()
+#         # Commit the changes to the database
+#         db.session.commit()
 
-        return {'message': 'Artwork removed from cart'}, 200
-
-
+#         return {'message': 'Artwork removed from cart'}, 200
 
 
-class ViewCartResource(Resource):
-    @user_required
-    def get(self, user_id):
-        cart = Cart.query.filter_by(user_id=user_id).first()
-        if not cart:
-            return {"error": "Cart not found"}, 404
 
-        cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-        if not cart_items:
-            return {"message": "Cart is empty"}, 200
 
-        cart_items_list = [item.to_dict() for item in cart_items]
+# class ViewCartResource(Resource):
+  
+#     def get(self, user_id):
+#         cart = Cart.query.filter_by(user_id=user_id).first()
+#         if not cart:
+#             return {"error": "Cart not found"}, 404
 
-        return {'items': cart_items_list}, 200
+#         cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+#         if not cart_items:
+#             return {"message": "Cart is empty"}, 200
+
+#         cart_items_list = [item.to_dict() for item in cart_items]
+
+#         return {'items': cart_items_list}, 200
     
 @app.route('/messages', methods=['POST'])
 @jwt_required()
@@ -1243,7 +1182,6 @@ api.add_resource(UpdateCartItemResource, '/update_cart_item')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 
 api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
-api.add_resource(ShippingResource, '/shipping_address', '/shipping_address/<int:user_id>')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
 api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>', '/bookings/<int:user_id>')

@@ -24,6 +24,7 @@ flask-socketio = "*"
 marshmallow-sqlalchemy = "*"
 flask-mail = "*"
 itsdangerous = "*"
+gunicorn = "*"
 
 [dev-packages]
 
