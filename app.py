@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("EXTERNAL_DATABASE_URL")
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -48,7 +48,7 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-#
+
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
@@ -436,12 +436,12 @@ class ArtworkByOrderResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
 class AddToCartResource(Resource):
     def post(self):
         data = request.get_json()
 
-        user_id = data.get('user_id')  
+        
+        user_id = data.get('user_id') 
         if not user_id:
             return {'error': 'User ID is required'}, 400
 
@@ -449,13 +449,14 @@ class AddToCartResource(Resource):
         if not user:
             return {'error': 'User not found'}, 404
 
+        
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
             cart = Cart(user_id=user.id)
             db.session.add(cart)
             db.session.commit()
 
-
+        
         artwork = Artwork.query.get(data['artwork_id'])
         if not artwork:
             return {'error': 'artwork not found'}, 404
@@ -465,7 +466,6 @@ class AddToCartResource(Resource):
         
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
         if cart_item:
-            
             cart_item.quantity += quantity  
         else:
             
@@ -483,16 +483,14 @@ class AddToCartResource(Resource):
         db.session.commit()
 
         return {'message': 'Artwork added to cart'}, 201
-
-
-class RemoveFromCartResource(Resource):
+     
+class UpdateCartItemResource(Resource):
     def post(self):
         data = request.get_json()
-
-        user_id = data.get('user_id')  
-        artwork_id = data.get('artwork_id')
-        if not user_id or not artwork_id:
-            return {'error': 'User ID and artwork ID are required'}, 400
+        
+        user_id = data.get('user_id')
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
 
         user = User.query.get(user_id)
         if not user:
@@ -500,39 +498,119 @@ class RemoveFromCartResource(Resource):
 
         cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
+            return {'error': 'Cart not found for user'}, 404
+
+        artwork = Artwork.query.get(data['artwork_id'])
+        if not artwork:
+            return {'error': 'Artwork not found'}, 404
+
+        new_quantity = data.get('quantity')
+        if new_quantity <= 0:
+            return {'error': 'Invalid quantity'}, 400
+
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+        if not cart_item:
+            return {'error': 'Cart item not found'}, 404
+
+        try:
+            # Use a transaction to ensure data consistency
+            with db.session.begin(subtransactions=True):
+                cart_item.quantity = new_quantity
+                db.session.commit()
+
+            return {'message': 'Cart item updated successfully'}, 200
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'Error updating cart item: {e}')
+            return {'error': 'Failed to update cart item'}, 500
+
+
+class RemoveFromCartResource(Resource):
+    @user_required  
+    def delete(self):
+        data = request.get_json()
+        
+        # Extract user_id and artwork_id from the request data
+        user_id = data.get('user_id')
+        artwork_id = data.get('artwork_id')
+
+        # Check if user_id and artwork_id are provided
+        if not user_id or not artwork_id:
+            return {'error': 'User ID and artwork ID are required'}, 400
+
+        # Retrieve the user by user_id
+        user = User.query.get(user_id)
+        if not user:
+            return {'error': 'User not found'}, 404
+
+        # Find the cart associated with the user
+        cart = Cart.query.filter_by(user_id=user.id).first()
+        if not cart:
             return {'error': 'Cart not found'}, 404
 
+        # Find the cart item that matches the given artwork_id
         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
         if not cart_item:
             return {'error': 'Artwork not found in cart'}, 404
 
-       
+        # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
         if cart_item.quantity > 1:
             cart_item.quantity -= 1
         else:
             db.session.delete(cart_item)
 
+        # Commit the changes to the database
         db.session.commit()
 
         return {'message': 'Artwork removed from cart'}, 200
 
 
+
+
 class ViewCartResource(Resource):
+    @user_required
     def get(self, user_id):
-       
         cart = Cart.query.filter_by(user_id=user_id).first()
         if not cart:
             return {"error": "Cart not found"}, 404
 
-        
         cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
         if not cart_items:
             return {"message": "Cart is empty"}, 200
 
-        
         cart_items_list = [item.to_dict() for item in cart_items]
-        return {'items': cart_items_list}, 200
 
+        return {'items': cart_items_list}, 200
+    
+# @app.route('/messages', methods=['POST'])
+# @jwt_required()
+# def send_message():
+#     data = request.json
+#     recipient_id = data.get('recipient_id')
+#     message_text = data.get('message')
+#     sender_id = get_jwt_identity()
+
+#     if not recipient_id or not message_text:
+#         return jsonify({"error": "Invalid data"}), 400
+
+#     new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
+#     db.session.add(new_message)
+#     db.session.commit()
+
+#     socketio.emit('new_message', {
+#         'sender_id': sender_id,
+#         'recipient_id': recipient_id,
+#         'content': message_text,
+#         'sent_at': new_message.sent_at.isoformat()
+#     })
+
+#     return jsonify({
+#         'id': new_message.id,
+#         'sender_id': sender_id,
+#         'recipient_id': recipient_id,
+#         'content': message_text,
+#         'sent_at': new_message.sent_at.isoformat()
+#     }), 201
 
 
 class Home(Resource):
@@ -891,152 +969,6 @@ class ArtworkCheckoutResource(Resource):
 
 
 
-# class AddToCartResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-
-        
-#         user_id = data.get('user_id') 
-#         if not user_id:
-#             return {'error': 'User ID is required'}, 400
-
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-        
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             cart = Cart(user_id=user.id)
-#             db.session.add(cart)
-#             db.session.commit()
-
-        
-#         artwork = Artwork.query.get(data['artwork_id'])
-#         if not artwork:
-#             return {'error': 'artwork not found'}, 404
-
-        
-#         quantity = data.get('quantity', 1)  
-        
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-#         if cart_item:
-#             cart_item.quantity += quantity  
-#         else:
-            
-#             cart_item = CartItem(
-#                 cart_id=cart.id,
-#                 artwork_id=artwork.id,
-#                 quantity=quantity, 
-#                 title = artwork.title,
-#                 description=artwork.description,
-#                 price=artwork.price,
-#                 image=artwork.image
-#             )
-#             db.session.add(cart_item)
-
-#         db.session.commit()
-
-#         return {'message': 'Artwork added to cart'}, 201
-     
-class UpdateCartItemResource(Resource):
-    def post(self):
-        data = request.get_json()
-        
-        user_id = data.get('user_id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
-
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            return {'error': 'Cart not found for user'}, 404
-
-        artwork = Artwork.query.get(data['artwork_id'])
-        if not artwork:
-            return {'error': 'Artwork not found'}, 404
-
-        new_quantity = data.get('quantity')
-        if new_quantity <= 0:
-            return {'error': 'Invalid quantity'}, 400
-
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-        if not cart_item:
-            return {'error': 'Cart item not found'}, 404
-
-        try:
-            # Use a transaction to ensure data consistency
-            with db.session.begin(subtransactions=True):
-                cart_item.quantity = new_quantity
-                db.session.commit()
-
-            return {'message': 'Cart item updated successfully'}, 200
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f'Error updating cart item: {e}')
-            return {'error': 'Failed to update cart item'}, 500
-
-
-# class RemoveFromCartResource(Resource):
-   
-#     def delete(self):
-#         data = request.get_json()
-        
-#         # Extract user_id and artwork_id from the request data
-#         user_id = data.get('user_id')
-#         artwork_id = data.get('artwork_id')
-
-#         # Check if user_id and artwork_id are provided
-#         if not user_id or not artwork_id:
-#             return {'error': 'User ID and artwork ID are required'}, 400
-
-#         # Retrieve the user by user_id
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-#         # Find the cart associated with the user
-#         cart = Cart.query.filter_by(user_id=user.id).first()
-#         if not cart:
-#             return {'error': 'Cart not found'}, 404
-
-#         # Find the cart item that matches the given artwork_id
-#         cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-#         if not cart_item:
-#             return {'error': 'Artwork not found in cart'}, 404
-
-#         # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
-#         if cart_item.quantity > 1:
-#             cart_item.quantity -= 1
-#         else:
-#             db.session.delete(cart_item)
-
-#         # Commit the changes to the database
-#         db.session.commit()
-
-#         return {'message': 'Artwork removed from cart'}, 200
-
-
-
-
-# class ViewCartResource(Resource):
-  
-#     def get(self, user_id):
-#         cart = Cart.query.filter_by(user_id=user_id).first()
-#         if not cart:
-#             return {"error": "Cart not found"}, 404
-
-#         cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-#         if not cart_items:
-#             return {"message": "Cart is empty"}, 200
-
-#         cart_items_list = [item.to_dict() for item in cart_items]
-
-#         return {'items': cart_items_list}, 200
-    
 @app.route('/messages', methods=['POST'])
 @jwt_required()
 def send_message():
@@ -1067,20 +999,26 @@ def send_message():
         'sent_at': new_message.sent_at.isoformat()
     }), 201
 
-@app.route('/messages', methods=['GET'])
-@jwt_required()
-def get_messages():
-    user_id = get_jwt_identity()
-    messages = Message.query.filter((Message.sender_id == user_id) | (Message.recipient_id == user_id)).all()
+class MessageResource(Resource):
+    @jwt_required()
+    def get(self):
+        user_id = get_jwt_identity()
+        messages = Message.query.filter(
+            (Message.sender_id == user_id) | (Message.recipient_id == user_id)
+        ).all()
 
-    return jsonify([{
-        'id': msg.id,
-        'sender_id': msg.sender_id,
-        'recipient_id': msg.recipient_id,
-        'content': msg.content,
-        'sent_at': msg.sent_at.isoformat()
-    } for msg in messages])
+        return jsonify([{
+            'id': msg.id,
+            'sender_id': msg.sender_id,
+            'recipient_id': msg.recipient_id,
+            'content': msg.content,
+            'sent_at': msg.sent_at.isoformat()
+        } for msg in messages])
 
+# Add the resource to the API with a URL
+
+
+# SocketIO event handlers
 @socketio.on('message')
 def handle_message(msg):
     print('Message: ' + msg)
@@ -1190,8 +1128,6 @@ class DashboardOverviewResource(Resource):
         return jsonify(response)
 
     
-
-
 from Resources.event import EventsResource
 from Resources.ticket import TicketResource
 from Resources.ticket import TicketResource
@@ -1216,6 +1152,7 @@ api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(UpdateCartItemResource, '/update_cart_item')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart')
 
+api.add_resource(MessageResource, '/messages')
 api.add_resource(PaymentResource, '/payments')
 # api.add_resource(PaymentSearchResource, '/payments/search')
 api.add_resource(ArtworkByOrderResource, '/artworks/order/<int:order_id>')

@@ -1,145 +1,439 @@
-from faker import Faker
-from random import randint, choice
-from datetime import datetime, timedelta
-from app import app, db  # Adjust the import according to your app structure
-from models import User, Event, Artwork, Ticket
-from sqlalchemy.sql import text
-import requests
-from dotenv import load_dotenv
 import os
+from datetime import datetime
+from app import app, db
+from models import Event, User, Booking, Ticket, Payment, Artwork
+from faker import Faker
+import logging
 
+# Initialize Faker
 fake = Faker()
-load_dotenv()
 
-UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
+# Set logging level
+logging.basicConfig(level=logging.INFO)
 
-
-def fetch_image_url(query):
-    response = requests.get('https://api.unsplash.com/photos/random', params={
-        'query': query,
-        'client_id': UNSPLASH_ACCESS_KEY,
-        'count': 50  
-    })
-
-    print(f"Response Status Code: {response.status_code}")
-    print(f"Response Content: {response.content}")
-
-    try:
-        data = response.json()
-        if data:
-            return data[0]['urls']['regular']
-    except ValueError:
-        print("Error decoding JSON response.")
-
-    return 'https://images.unsplash.com/photo-1580195319388-1bea55742a42?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTh8fGFydCUyMGdhbGxlcnl8ZW58MHx8MHx8fDA%3D'  # Fallback image
-
-def create_users(num_users):
-    users = []
-    for _ in range(num_users):
-        try:
-            username = fake.user_name()
-            email = fake.email()
-            password = fake.password()
-            role = choice(['user', 'admin'])
-            is_admin = role == 'admin'
-            is_seller = role == 'user'
-            
-            user = User(
-                username=username,
-                email=email,
-                password=password,
-                role=role,
-                is_admin=is_admin,
-                is_seller=is_seller
-            )
-            users.append(user)
-        except Exception as e:
-            print(f"Error creating user: {e}")
-    return users
-
-def create_events(users, num_events):
-    events = []
-    for _ in range(num_events):
-        title = fake.sentence(nb_words=3)
-        image_url = fetch_image_url('art gallery')
-        description = fake.text(max_nb_chars=400)
-        start_date = fake.date_between(start_date='today', end_date='+1y')
-        end_date = start_date + timedelta(days=randint(1, 10))
-        user_id = choice([user.id for user in users])
-        time = fake.time()
-        location = fake.address()
-
-        event = Event(
-            title=title,
-            image_url=image_url,
-            description=description,
-            start_date=start_date,
-            end_date=end_date,
-            user_id=user_id,
-            time=time,
-            location=location
-        )
-        events.append(event)
-    return events
-
-def create_artworks(num_artworks):
-    artworks = []
-    for _ in range(num_artworks):
-        title = fake.word()
-        description = fake.text(max_nb_chars=400)
-        price = randint(100, 10000)
-        image = fetch_image_url('art')
-
-        artwork = Artwork(
-            title=title,
-            description=description,
-            price=price,
-            image=image
-        )
-        artworks.append(artwork)
-    return artworks
-
-def create_tickets(events):
-    tickets = []
-    ticket_types = ['Regular', 'VIP', 'VVIP']
-    for event in events:
-        for type_name in ticket_types:
-            price = randint(50, 500)
-            quantity = randint(100, 1000)
-
-            ticket = Ticket(
-                event_id=event.id,
-                type_name=type_name,
-                price=price,
-                quantity=quantity
-            )
-            tickets.append(ticket)
-    return tickets
-
-def seed_data():
+def delete_existing_data():
     with app.app_context():
-        # Clear existing data
-        db.session.execute(text('TRUNCATE TABLE events, artworks, tickets RESTART IDENTITY CASCADE'))
+        logging.info("Deleting existing data...")
+        Booking.query.delete()
+        Ticket.query.delete()
+        Payment.query.delete()
+        Artwork.query.delete()
+        Event.query.delete()
+        User.query.delete()
         db.session.commit()
 
-        # Create and add data
-        users = create_users(5)
-        db.session.add_all(users)
+
+
+def seed_users(num_users=10):
+    with app.app_context():
+        logging.info("Seeding users...")
+        users = [User(username=fake.user_name(), email=fake.email(), password=fake.password(), role='user') for _ in range(num_users)]
+        db.session.bulk_save_objects(users)
         db.session.commit()
+        logging.info("Users seeded.")
 
-        events = create_events(users, 30)
-        db.session.add_all(events)
-        db.session.commit()
+def seed_events():
+    events_data = [
+        {
+            "title": "The Grief Paintings",
+            "image_url": "https://images.artnet.com/gallery-images/425937671/95826851-8e2f-4dbe-a10d-e9c97c1b7997.jpg?x=1320%40%211320aD0xMzIwJnc9MTMyMCZmPWNvbnRhaW4mdD1s",
+            "description": "An exhibition of new paintings by Helen Marden, created with resin, powdered pigment, ink, and natural objects, reflecting on life, love, and creativity.",
+            "start_date": "24-07-2024",
+            "end_date": "14-09-2024",
+            "user_id": 1,
+            "time": "10:00:00",
+            "location": "Gagosian 821 Park Avenue New York, NY USA"
+        },
+        {
+            "title": "A Black Revolutionary Artist",
+            "image_url": "https://www.nga.gov/content/dam/ngaweb/exhibitions/promos/2025/elizabeth-catlett-black-unity.jpg",
+            "description": "Showcasing over 150 works by Elizabeth Catlett, this exhibition explores her career from DC to Mexico, highlighting her focus on social justice.",
+            "start_date": "13-09-2024",
+            "end_date": "19-01-2025",
+            "user_id": 2,
+            "time": "20:00:00",
+            "location": "Brooklyn Museum of Art"
+        },
+        {
+            "title": "Summer Album",
+            "image_url": "https://images.artnet.com/gallery-images/424675664/5e88ef11-6277-4c47-98db-de80afa8d678.jpg?x=1320%40%211320aD0xMzIwJnc9MTMyMCZmPWNvbnRhaW4mdD1s",
+            "description": "A curated collection capturing the essence and vibrancy of summer through diverse artworks.",
+            "start_date": "26-07-2024",
+            "end_date": "07-09-2024",
+            "user_id": 3,
+            "time": "08:00:00",
+            "location": "Ben Brown Fine Arts, Hong Kong China"
+        },
+        {
+            "title": "Sculpting Dreams: Hands-On Sculpture Workshop",
+            "image_url": "https://i.pinimg.com/474x/ca/50/26/ca50269e08f91b279490386227b9b6ff.jpg",
+            "description": "A dynamic workshop for beginners to explore sculpture using mixed media.",
+            "start_date": "12-08-2024",
+            "end_date": "15-08-2024",
+            "user_id": 4,
+            "time": "14:00:00",
+            "location": "Art Center Studio, 123 Elm Street, Chicago, IL"
+        },
+        {
+            "title": "Frühe Grafik",
+            "image_url": "https://images.artnet.com/gallery-images/115607/1638779.jpg?x=%40%21614xiu8%5EaD0mdz02MTQmZj1jb250YWluJnQ9bA%3D%3D",
+            "description": "Bernhard Luginbühl's early graphic works, revealing intricate lines and bold forms.",
+            "start_date": "05-09-2024",
+            "end_date": "01-11-2024",
+            "user_id": 5,
+            "time": "12:00:00",
+            "location": "Galerie Ziegler, Switzerland"
+        },
+        {
+            "title": "Commemorations",
+            "image_url": "https://images.artnet.com/gallery-images/115607/1638779.jpg?x=%40%21614xiu8%5EaD0mdz02MTQmZj1jb250YWluJnQ9bA%3D%3D",
+            "description": "Joe Bloom’s solo exhibition featuring stained-glass orbs that symbolize light and tribute.",
+            "start_date": "02-08-2024",
+            "end_date": "14-09-2024",
+            "user_id": 6,
+            "time": "10:00:00",
+            "location": "Kristin Hjellegjerde Gallery, London"
+        }
+    ]
+    
+    with app.app_context():
+        logging.info("Seeding events...")
+        for event_data in events_data:
+            try:
+                start_date = datetime.strptime(event_data["start_date"], "%d-%m-%Y").date()
+                end_date = datetime.strptime(event_data["end_date"], "%d-%m-%Y").date()
+                event_time = datetime.strptime(event_data["time"], "%H:%M:%S").time()
 
-        artworks = create_artworks(20)
-        db.session.add_all(artworks)
-        db.session.commit()
+                event = Event(
+                    title=event_data["title"],
+                    image_url=event_data["image_url"],
+                    description=event_data["description"],
+                    start_date=start_date,
+                    end_date=end_date,
+                    user_id=event_data["user_id"],
+                    time=event_time,
+                    location=event_data["location"],
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(event)
+            except Exception as e:
+                logging.error(f"Error adding event {event_data['title']}: {e}")
 
-        tickets = create_tickets(events)
-        db.session.add_all(tickets)
-        db.session.commit()
+        try:
+            db.session.commit()
+            logging.info("Events seeded.")
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error committing to database: {e}")
 
-        print('Data seeded successfully!')
+def seed_artworks():
+    artworks_data = [
+         {
+        "title": "Starry Night",
+        "description": "A masterpiece by Vincent van Gogh, depicting a dreamy view from the artist's asylum room.",
+        "price": 1,
+        "image": "https://i.ibb.co/484yd5n/Starry-night.jpg"
+    },
+    {
+        "title": "Mona Lisa",
+        "description": "A portrait of Lisa Gherardini, painted by Leonardo da Vinci.",
+        "price": 1,
+        "image": "https://i.ibb.co/yQDhv3z/monalisa.jpg"
+    },
+    {
+        "title": "The Scream",
+        "description": "An iconic work by Edvard Munch, symbolizing human anxiety.",
+        "price": 120000000,
+        "image": "https://i.ibb.co/PMhrqp2/the-scream.jpg"
+    },
+    {
+        "title": "The Persistence of Memory",
+        "description": "A surreal painting by Salvador Dalí, showcasing melting clocks.",
+        "price": 6000000,
+        "image": "https://i.ibb.co/kHxK6FV/The-Persistence-of-Memory.jpg"
+    },
+    {
+        "title": "Girl with a Pearl Earring",
+        "description": "An oil painting by Johannes Vermeer, depicting a girl with a pearl earring.",
+        "price": 7000000,
+        "image": "https://i.ibb.co/dPz3dHT/girlpearlearing.jpg"
+    },
+    {
+        "title": "The Night Watch",
+        "description": "A painting by Rembrandt, portraying a group of city guards.",
+        "price": 45000000,
+        "image": "https://i.ibb.co/GJCgyrG/The-Night-Watch.jpg"
+    },
+    {
+        "title": "Guernica",
+        "description": "An anti-war painting by Pablo Picasso, reflecting the bombing of Guernica.",
+        "price": 200000000,
+        "image": "https://i.ibb.co/gVB8SQK/Picasso-Guernica.jpg"
+    },
+    {
+        "title": "The Birth of Venus",
+        "description": "A painting by Sandro Botticelli, depicting Venus emerging from the sea.",
+        "price": 100000000,
+        "image": "https://i.ibb.co/wwHdp6F/the-venus.jpg"
+    },
+    {
+        "title": "The Kiss",
+        "description": "A painting by Gustav Klimt, representing an intimate embrace.",
+        "price": 150000000,
+        "image": "https://i.ibb.co/PFVyPRw/The-Kiss.jpg"
+    },
+    {
+        "title": "American Gothic",
+        "description": "A painting by Grant Wood, showing a farmer and his daughter.",
+        "price": 30000000,
+        "image": "https://i.ibb.co/5xMc8zq/American-Gothic.jpg"
+    },
+    {
+        "title": "The Arnolfini Portrait",
+        "description": "A painting by Jan van Eyck, featuring a double portrait of Giovanni di Nicolao di Arnolfini and his wife.",
+        "price": 20000000,
+        "image": "https://i.ibb.co/ZjvTs9J/Arnolfini-Portrait.jpg"
+    },
+    {
+        "title": "Water Lilies",
+        "description": "A series of approximately 250 oil paintings by Claude Monet, depicting his flower garden at Giverny.",
+        "price": 8000000,
+        "image": "https://i.ibb.co/zGc8Pmj/waterlilies.jpg"
+    },
+    {
+        "title": "The Last Supper",
+        "description": "A late 15th-century mural painting by Leonardo da Vinci, housed by the Convent of Santa Maria delle Grazie in Milan.",
+        "price": 450000000,
+        "image": "https://i.ibb.co/K27gBcW/The-Last-Supper.jpg"
+    },
+    {
+        "title": "Liberty Leading the People",
+        "description": "A painting by Eugène Delacroix commemorating the July Revolution of 1830 in France.",
+        "price": 50000000,
+        "image": "https://i.ibb.co/rfnFKXD/La-Libert-guidant.jpg"
+    },
+    {
+        "title": "The Hay Wain",
+        "description": "A painting by John Constable, showing a rural scene on the River Stour between the English counties of Suffolk and Essex.",
+        "price": 10000000,
+        "image": "https://i.ibb.co/7nKMrhx/The-Hay-Wain-1821.jpg"
+    },
+    {
+        "title": "The Garden of Earthly Delights",
+        "description": "A triptych by the Early Netherlandish painter Hieronymus Bosch, depicting the Garden of Eden and the Last Judgment.",
+        "price": 80000000,
+        "image": "https://i.ibb.co/9nZrC4G/The-Garden-of-earthly-delights.jpg"
+    },
+    {
+        "title": "The School of Athens",
+        "description": "A fresco by the Italian Renaissance artist Raphael, representing philosophy.",
+        "price": 100000000,
+        "image": "https://i.ibb.co/yFNzSsS/The-School-of-Athens-by-Raffaello-Sanzio-da-Urbino.jpg"
+    },
+    {
+        "title": "The Wanderer above the Sea of Fog",
+        "description": "An oil painting by German Romantic artist Caspar David Friedrich, depicting a man standing on a rocky promontory.",
+        "price": 6000000,
+        "image": "https://i.ibb.co/4W2x7XW/Wanderer-above-the-Sea-of-Fog.jpg"
+    },
+    {
+        "title": "Las Meninas",
+        "description": "A painting by Diego Velázquez, depicting the Infanta Margarita Teresa surrounded by her entourage.",
+        "price": 200000000,
+        "image": "https://i.ibb.co/zmjF5XM/Las-Meninas.jpg"
+    },
+    {
+        "title": "Whistler's Mother",
+        "description": "An 1871 painting by American-born artist James McNeill Whistler, depicting his mother, Anna McNeill Whistler.",
+        "price": 35000000,
+        "image": "https://i.ibb.co/k6ybRGc/Whistlers-Mother-high-res.jpg"
+    },
+    {
+        "title": "A Sunday Afternoon on the Island of La Grande Jatte",
+        "description": "A painting by Georges Seurat, depicting people relaxing in a suburban park on an island in the Seine River.",
+        "price": 8000000,
+        "image": "https://i.ibb.co/7rSCy8Q/sunday-afternoon.jpg"
+    },
+    {
+        "title": "Nighthawks",
+        "description": "A painting by Edward Hopper, portraying people in a downtown diner late at night.",
+        "price": 9000000,
+        "image": "https://i.ibb.co/3M8GQfT/nighthawk.jpg"
+    },
+    {
+        "title": "The Night Café",
+        "description": "An oil painting created by Dutch artist Vincent van Gogh in 1888, depicting a night café in Arles.",
+        "price": 40000000,
+        "image": "https://i.ibb.co/qg7YZBF/Vincent-Willem-van- Gogh-076.jpg"
+    },
+    {
+        "title": "Impression, Sunrise",
+        "description": "A painting by Claude Monet, which gave rise to the name of the Impressionist movement.",
+        "price": 11000000,
+        "image": "https://i.ibb.co/51xpFXY/impression-sunrise.jpg"
+    },
+    {
+        "title": "The Gleaners",
+        "description": "An oil painting by Jean-François Millet, depicting three peasant women gleaning a field of stray stalks of wheat after the harvest.",
+        "price": 15000000,
+        "image": "https://i.ibb.co/Ct49hym/Jean-Fran-ois-Millet.jpg"
+    },
+    {
+        "title": "The Card Players",
+        "description": "A series of oil paintings by the French Post-Impressionist artist Paul Cézanne.",
+        "price": 250000000,
+        "image": "https://i.ibb.co/mDrKMgB/260px-Les-Joueurs-de-cartes.jpg"
+    },
+    {
+        "title": "Bal du moulin de la Galette",
+        "description": "A painting by French artist Pierre-Auguste Renoir, portraying a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
+        "price": 78000000,
+        "image": "https://i.ibb.co/YT68J2v/1200px-Auguste-Renoir-Le-Moulin-de-la-Galette.jpg"
+    },
+        {
+            "title": "Bal du moulin de la Galette",
+            "description": "A painting by French artist Pierre-Auguste Renoir, portraying a typical Sunday afternoon at the original Moulin de la Galette in the district of Montmartre in Paris.",
+            "price": 78000000,
+            "image": "https://i.ibb.co/YT68J2v/1200px-Auguste-Renoir-Le-Moulin-de-la-Galette.jpg"
+        },
+        {
+            "title": "Venus de Milo",
+            "description": "An ancient Greek statue and one of the most famous works of ancient Greek sculpture, attributed to Alexandros of Antioch.",
+            "price": 100000000,
+            "image": "https://i.ibb.co/mTdTV0Q/Venus-de-Milo-Louvre-Ma-399-n2.jpg"
+        },
+        {
+            "title": "The Thinker",
+            "description": "A bronze sculpture by Auguste Rodin, representing a man in sober meditation battling with a powerful internal struggle.",
+            "price": 14000000,
+            "image": "https://i.ibb.co/FwM5Df1/The-Thinker-Auguste-Rodin-1904.jpg"
+        }
 
-if __name__ == '__main__':
-    seed_data()
+    ]
+    
+    with app.app_context():
+        logging.info("Seeding artworks...")
+        for artwork_data in artworks_data:
+            try:
+                artwork = Artwork(
+                    title=artwork_data["title"],
+                    description=artwork_data["description"],
+                    price=artwork_data["price"],
+                    image=artwork_data["image"],
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(artwork)
+            except Exception as e:
+                logging.error(f"Error adding Artwork {artworks_data['title']}: {e}")
+
+        try:
+            db.session.commit()
+            logging.info("Artworks seeded.")
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error committing to database: {e}")
+            
+            
+            
+            
+def create_ticket_data():
+    with app.app_context():
+        # Fetch the first 6 events
+        events = Event.query.limit(6).all()
+       
+        if not events:
+            print("No events found in the database.")
+            return
+       
+        # Define ticket data for each event
+        ticket_data = [
+            # Event 1 tickets
+            {
+                'event_id': events[0].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 100, 'quantity': 200},
+                    {'type_name': 'VIP', 'price': 200, 'quantity': 100},
+                    {'type_name': 'VVIP', 'price': 300, 'quantity': 50},
+                ]
+            },
+            # Event 2 tickets
+            {
+                'event_id': events[1].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 120, 'quantity': 180},
+                    {'type_name': 'VIP', 'price': 220, 'quantity': 90},
+                    {'type_name': 'VVIP', 'price': 320, 'quantity': 40},
+                ]
+            },
+            # Event 3 tickets
+            {
+                'event_id': events[2].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 110, 'quantity': 210},
+                    {'type_name': 'VIP', 'price': 210, 'quantity': 110},
+                    {'type_name': 'VVIP', 'price': 310, 'quantity': 60},
+                ]
+            },
+            # Event 4 tickets
+            {
+                'event_id': events[3].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 130, 'quantity': 170},
+                    {'type_name': 'VIP', 'price': 230, 'quantity': 80},
+                    {'type_name': 'VVIP', 'price': 330, 'quantity': 30},
+                ]
+            },
+            # Event 5 tickets
+            {
+                'event_id': events[4].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 140, 'quantity': 160},
+                    {'type_name': 'VIP', 'price': 240, 'quantity': 70},
+                    {'type_name': 'VVIP', 'price': 340, 'quantity': 20},
+                ]
+            },
+            # Event 6 tickets
+            {
+                'event_id': events[5].id,
+                'tickets': [
+                    {'type_name': 'Regular', 'price': 150, 'quantity': 150},
+                    {'type_name': 'VIP', 'price': 250, 'quantity': 60},
+                    {'type_name': 'VVIP', 'price': 350, 'quantity': 10},
+                ]
+            },
+        ]
+       
+        tickets = []
+       
+        # Create Ticket instances based on the defined data
+        for event_tickets in ticket_data:
+            for ticket_info in event_tickets['tickets']:
+                ticket = Ticket(
+                    event_id=event_tickets['event_id'],
+                    type_name=ticket_info['type_name'],
+                    price=ticket_info['price'],
+                    quantity=ticket_info['quantity']
+                )
+                tickets.append(ticket)
+       
+        # Add tickets to the database
+        try:
+            db.session.add_all(tickets)
+            db.session.commit()
+            print(f"Created and added {len(tickets)} tickets to the database.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error adding tickets to the database: {e}")           
+            
+
+def main():
+    logging.info("Starting data seeding...")
+    delete_existing_data()
+    seed_users()
+    seed_events()
+    seed_artworks()
+    logging.info("Data seeding completed.")
+
+if __name__ == "__main__":
+    main()
+    create_ticket_data()

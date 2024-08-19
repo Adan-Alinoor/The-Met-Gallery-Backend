@@ -2,6 +2,8 @@ from flask_restful import Resource, reqparse
 from flask import jsonify, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Ticket
+from flask import request
+
 
 
 ticket_admin_parser = reqparse.RequestParser()
