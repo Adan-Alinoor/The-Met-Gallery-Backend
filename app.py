@@ -127,7 +127,6 @@ class Signup(Resource):
         
         
 
-
 class VerifyEmail(Resource):
     def get(self, token):
         try:
@@ -152,8 +151,6 @@ class VerifyEmail(Resource):
 
         logging.info(f"User with email {email} has been successfully verified.")
         return make_response({"message": "Your account has been verified. You can now log in."}, 200)
-
-
     
 
 class TestEmail(Resource):
@@ -205,7 +202,6 @@ class Login(Resource):
             "success": True,
             "message": "Login successful"
         }, 200)
-
 
 
     
