@@ -28,6 +28,7 @@ class Artwork(db.Model, SerializerMixin):
     description = db.Column(db.String, nullable=False)
     price = db.Column(db.Integer, nullable=False)
     image = db.Column(db.String, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     serialize_only = ('id', 'title', 'description', 'price', 'image', 'created_at')
 
@@ -131,6 +132,20 @@ class CartItem(db.Model, SerializerMixin):
     title = db.Column(db.String, nullable=False)
     description = db.Column(db.Text, nullable=True)
     image = db.Column(db.String, nullable=True)
+    
+    
+    def to_dict(self):
+        return{
+            'id': self.id,
+            'cart_id': self.cart_id,
+            'artwork_id': self.artwork_id,
+            'quantity': self.quantity,
+            'price': self.price,
+            'title': self.title,
+            'description': self.description,
+            'image': self.image,
+            'artwork': self.artwork.to_dict() if self.artwork else None  # Add artwork data if it exists, else return None
+        }
 
     cart = db.relationship('Cart', back_populates='items')
     artwork = db.relationship('Artwork')
