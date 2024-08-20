@@ -45,7 +45,7 @@ app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
-socketio = SocketIO(app, cors_allowed_origins="https://the-met-gallery-frontend-nbi7.vercel.app")
+socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app"])
 
 
 
