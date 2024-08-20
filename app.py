@@ -34,7 +34,7 @@ from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 
 from flask_socketio import SocketIO, send, emit
-from socketio import ASGIApp, Server
+
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -46,7 +46,7 @@ app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
 
 
 
@@ -60,8 +60,7 @@ app.config['MAIL_DEFAULT_SENDER'] = 'zizkoteam@gmail.com'
 
 mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-sio = Server(cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
-app.mount("/", ASGIApp(sio, other_asgi_app=app))
+socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
 
 
 ma = Marshmallow(app)
