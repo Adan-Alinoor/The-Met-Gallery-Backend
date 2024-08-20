@@ -95,7 +95,7 @@ class Signup(Resource):
 
             # Generate email confirmation token
             token = s.dumps(new_user.email, salt='email-confirmation')
-            verify_url = f"http://localhost:5555/verify/{token}"
+            verify_url = f"https://the-met-gallery-backend.onrender.com/verify/{token}"
 
             # Prepare confirmation email
             msg = Message("Please confirm your email", recipients=[new_user.email])
