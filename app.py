@@ -59,7 +59,7 @@ app.config['MAIL_DEFAULT_SENDER'] = 'zizkoteam@gmail.com'
 mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 sio = Server(cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
-app.mount("/", ASGIApp(sio, other_asgi_app=app))
+# app.mount("/", ASGIApp(sio, other_asgi_app=app))
 
 
 ma = Marshmallow(app)
