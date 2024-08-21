@@ -449,6 +449,7 @@ class ArtworkByOrderResource(Resource):
 class AddToCartResource(Resource):
     def post(self):
         verify_jwt_in_request(optional=True)
+        
         # Get the current user ID if logged in
         current_user_id = get_jwt_identity()
 
@@ -480,14 +481,28 @@ class AddToCartResource(Resource):
         artwork_id = data.get('artwork_id')
         quantity = data.get('quantity', 1)
 
+        # Fetch artwork price from the database or another source
+        artwork = Artwork.query.get(artwork_id)
+        if not artwork:
+            return {'error': 'Artwork not found'}, 404
+
+        price = artwork.price
+        if price is None:
+            return {'error': 'Price not set for this artwork'}, 400
+
         # Check if the item already exists in the cart
         cart_item = CartItem.query.filter_by(cart_id=active_cart.id, artwork_id=artwork_id).first()
         if cart_item:
             # If it exists, update the quantity
             cart_item.quantity += quantity
         else:
-            # If it doesn't exist, create a new cart item
-            cart_item = CartItem(cart_id=active_cart.id, artwork_id=artwork_id, quantity=quantity)
+            # If it doesn't exist, create a new cart item with price
+            cart_item = CartItem(
+                cart_id=active_cart.id,
+                artwork_id=artwork_id,
+                quantity=quantity,
+                price=price
+            )
             db.session.add(cart_item)
 
         db.session.commit()
