@@ -188,12 +188,6 @@ class Login(Resource):
 
         # Generate an access token
         access_token = create_access_token(identity=user.id)
-        session_key = request.cookies.get('session')
-        cart_query = Cart.query.filter_by(is_active=True)
-        cart_query = cart_query.filter_by(sess=session_key)
-        cart = cart_query.first()
-        cart.user_id = user.id
-        db.session.commit()
         
         # Return a success response with user data and token
         return make_response({
