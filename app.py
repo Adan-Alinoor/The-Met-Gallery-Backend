@@ -14,7 +14,7 @@ from flask_marshmallow import Marshmallow
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
-import o
+import os
 from flask import Flask, request, jsonify
 import requests
 import uuid
@@ -62,7 +62,7 @@ mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 # sio = Server(cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
 # app.mount("/", ASGIApp(sio, other_asgi_app=app))
-socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app", "https://the-met-gallery-frontend-wh3n.vercel.app:5000", "wss://the-met-gallery-frontend-wh3n.vercel.app", "wss://the-met-gallery-frontend-wh3n.vercel.app:5000"], async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app"], async_mode='eventlet')
 
 
 ma = Marshmallow(app)
@@ -701,7 +701,7 @@ def create_payment(payment_data):
         "PartyA": payment_data['phone_number'],
         "PartyB": SHORTCODE,
         "PhoneNumber": payment_data['phone_number'],
-        "CallBackURL": "https://5769-102-214-74-3.ngrok-free.app/callback",  
+        "CallBackURL": "  https://1a61-102-214-72-2.ngrok-free.app /callback",  
         "AccountReference": f"Order{payment_data.get('order_id')}",
         "TransactionDesc": "Payment for order"
     }
