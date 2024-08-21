@@ -928,7 +928,7 @@ class ArtworkCheckoutResource(Resource):
             if not user:
                 return {'error': 'User not found'}, 404
 
-            cart = Cart.query.filter_by(user_id=user.id).first()
+            cart = Cart.query.filter_by(user_id=user.id, is_active=True).first()
             if not cart or not cart.items:
                 return {'error': 'Cart is empty'}, 400
 
@@ -940,7 +940,10 @@ class ArtworkCheckoutResource(Resource):
                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
                 if not cart_item or cart_item.quantity < quantity:
                     return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
-
+                
+                if cart_item.price is None:
+                    return {'error': f'Price not set for artwork ID {artwork_id}'}, 400
+                
                 total_amount += cart_item.price * quantity
 
             # Create the order with the total amount
@@ -954,21 +957,19 @@ class ArtworkCheckoutResource(Resource):
 
                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
 
-                order_item = OrderItem(
-                    order_id=order.id,
-                    artwork_id=artwork_id,
-                    quantity=quantity,
-                    price=cart_item.price,
-                    # title=cart_item.title,  # Ensure title is passed here
-                    # description=cart_item.description,  # Include other fields if necessary
-                    # image=cart_item.image  # Include other fields if necessary
-                )
-                db.session.add(order_item)
+                if cart_item:
+                    order_item = OrderItem(
+                        order_id=order.id,
+                        artwork_id=artwork_id,
+                        quantity=quantity,
+                        price=cart_item.price,
+                    )
+                    db.session.add(order_item)
 
-                if cart_item.quantity > quantity:
-                    cart_item.quantity -= quantity
-                else:
-                    db.session.delete(cart_item)
+                    if cart_item.quantity > quantity:
+                        cart_item.quantity -= quantity
+                    else:
+                        db.session.delete(cart_item)
 
             db.session.commit()
 
@@ -995,6 +996,7 @@ class ArtworkCheckoutResource(Resource):
             db.session.rollback()
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
+
 
 
 # class ArtworkCheckoutResource(Resource):
