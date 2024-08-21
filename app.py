@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, session
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
 from models import db, User, Cart, CartItem, Order, Payment, OrderItem, Artwork, Message, Notification, Event, UserActivity, Booking
@@ -6,21 +6,20 @@ import bcrypt
 import base64
 from datetime import datetime,timedelta
 from marshmallow import Schema, fields
-from flask_jwt_extended import decode_token
 from flask_marshmallow import Marshmallow
 
 from flask_mail import Mail, Message
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired
-from itsdangerous import BadSignature, SignatureExpired
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 import os
 from flask import Flask, request, jsonify
 import requests
+import uuid
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_restful import Resource, Api, reqparse
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token, verify_jwt_in_request
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask_cors import CORS
@@ -124,9 +123,6 @@ class Signup(Resource):
             logging.error(f"Error during registration: {e}")
             return make_response({"message": "Error during registration. Please try again later."}, 500)
 
-        
-        
-
 class VerifyEmail(Resource):
     def get(self, token):
         try:
@@ -188,6 +184,12 @@ class Login(Resource):
 
         # Generate an access token
         access_token = create_access_token(identity=user.id)
+        session_key = request.cookies.get('session')
+        cart_query = Cart.query.filter_by(is_active=True)
+        cart_query = cart_query.filter_by(sess=session_key)
+        cart = cart_query.first()
+        cart.user_id = user.id
+        db.session.commit()
         
         # Return a success response with user data and token
         return make_response({
@@ -369,8 +371,8 @@ class ArtworkListResource(Resource):
             return [artwork.to_dict() for artwork in artworks], 200
         except Exception as e:
             return {"error": str(e)}, 500
-
-    @user_required  # Assuming this decorator adds `user_id` to the function parameters
+        
+    @jwt_required()
     def post(self, user_id):
         data = request.get_json()
         print("Received data:", data)
@@ -448,211 +450,167 @@ class ArtworkByOrderResource(Resource):
 
 class AddToCartResource(Resource):
     def post(self):
-        data = request.get_json()
-        
-        user_id = data.get('user_id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+        verify_jwt_in_request(optional=True)
+        # Get the current user ID if logged in
+        current_user_id = get_jwt_identity()
 
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            cart = Cart(user_id=user.id)
-            db.session.add(cart)
-            db.session.commit()
-
-        artwork = Artwork.query.get(data['artwork_id'])
-        if not artwork:
-            return {'error': 'Artwork not found'}, 404
-
-        quantity = data.get('quantity', 1)  
-
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
-        if cart_item:
-            cart_item.quantity += quantity  
+        if current_user_id:
+            # If the user is logged in, find or create an active cart for the user
+            active_cart = Cart.query.filter_by(user_id=current_user_id, is_active=True).first()
+            if not active_cart:
+                active_cart = Cart(user_id=current_user_id, is_active=True)
+                db.session.add(active_cart)
+                db.session.commit()
         else:
-            cart_item = CartItem(
-                cart_id=cart.id,
-                artwork_id=artwork.id,
-                quantity=quantity,
-                title=artwork.title,
-                description=artwork.description,
-                price=artwork.price,
-                image=artwork.image
-            )
+            # If the user is not logged in, use a session key
+            sess = request.cookies.get('session_key')
+            if not sess:
+                # Generate a session key if not already present
+                session_key = str(uuid.uuid4())
+                response = make_response()
+                response.set_cookie('session_key', session_key)
+
+            # Find or create an active cart for the session
+            active_cart = Cart.query.filter_by(sess=sess, is_active=True).first()
+            if not active_cart:
+                active_cart = Cart(sess=sess, is_active=True)
+                db.session.add(active_cart)
+                db.session.commit()
+
+        # Extract the artwork_id and quantity from the post data
+        data = request.get_json()
+        artwork_id = data.get('artwork_id')
+        quantity = data.get('quantity', 1)
+
+        # Check if the item already exists in the cart
+        cart_item = CartItem.query.filter_by(cart_id=active_cart.id, artwork_id=artwork_id).first()
+        if cart_item:
+            # If it exists, update the quantity
+            cart_item.quantity += quantity
+        else:
+            # If it doesn't exist, create a new cart item
+            cart_item = CartItem(cart_id=active_cart.id, artwork_id=artwork_id, quantity=quantity)
             db.session.add(cart_item)
 
         db.session.commit()
 
-        cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-
-        serialized_cart_items = [
-            {
-                'id': item.id,
-                'name': item.title,
-                'quantity': item.quantity,
-                'price': item.price,
-                'image': item.image,
-                'description': item.description
-            }
-            for item in cart_items
-        ]
-
-        print('Serialized cart items:', serialized_cart_items)  # Debugging line
-
-        return {
-            'message': 'Artwork added to cart',
-            'cart_items': serialized_cart_items
-        }, 201
+        return {"message": "Item added to cart successfully", "cart_id": active_cart.id}, 200
 
 
      
 class UpdateCartItemResource(Resource):
-    def post(self):
-        data = request.get_json()
+    def put(self, item_id):
+        verify_jwt_in_request(optional=True)
+        # Get the current user ID if logged in, or session key if not
+        current_user = get_jwt_identity()
+        session_key = request.cookies.get('session')
+
+        # Fetch the active cart based on user or session key
+        cart_query = Cart.query.filter_by(is_active=True)
         
-        user_id = data.get('user_id')
-        if not user_id:
-            return {'error': 'User ID is required'}, 400
+        if current_user:
+            cart_query = cart_query.filter_by(user_id=current_user)
+        else:
+            cart_query = cart_query.filter_by(sess=session_key)
+        
+        cart = cart_query.first()
+        
+        print("we starting")
 
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        cart = Cart.query.filter_by(user_id=user.id).first()
         if not cart:
-            return {'error': 'Cart not found for user'}, 404
-
-        artwork = Artwork.query.get(data['artwork_id'])
-        if not artwork:
-            return {'error': 'Artwork not found'}, 404
-
+            return {"error": "Active cart not found"}, 404
+        
+        data = request.get_json()
         new_quantity = data.get('quantity')
-        if new_quantity <= 0:
-            return {'error': 'Invalid quantity'}, 400
 
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork.id).first()
+        # Fetch the CartItem by id
+        cart_item = CartItem.query.filter_by(artwork_id=item_id, cart_id=cart.id).first()
         if not cart_item:
-            return {'error': 'Cart item not found'}, 404
+            return {"error": "Cart item not found"}, 404
+        if new_quantity is None or new_quantity <= 0:
+            return {"error": "Invalid quantity"}, 400
 
-        try:
-            # Use a transaction to ensure data consistency
-            with db.session.begin(subtransactions=True):
-                cart_item.quantity = new_quantity
-                db.session.commit()
+        # Update the CartItem's quantity
+        cart_item.quantity = new_quantity
+        db.session.commit()
+        # Fetch all items related to the active cart
+        all_cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+        serialized_items = [item.to_dict() for item in all_cart_items]
 
-            return {'message': 'Cart item updated successfully'}, 200
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f'Error updating cart item: {e}')
-            return {'error': 'Failed to update cart item'}, 500
+        return {
+            "message": "Cart item updated successfully",
+            "cart_items": serialized_items
+        }, 200
 
 
 class RemoveFromCartResource(Resource):
-    @user_required  
-    def delete(self):
-        data = request.get_json()
+    def delete(self, item_id):
+        verify_jwt_in_request(optional=True)
+        # Get the current user ID if logged in, or session key if not
+        current_user = get_jwt_identity()
+        session_key = request.cookies.get('session')
+
+        # Fetch the active cart based on user or session key
+        cart_query = Cart.query.filter_by(is_active=True)
         
-        # Extract user_id and artwork_id from the request data
-        user_id = data.get('user_id')
-        artwork_id = data.get('artwork_id')
-
-        # Check if user_id and artwork_id are provided
-        if not user_id or not artwork_id:
-            return {'error': 'User ID and artwork ID are required'}, 400
-
-        # Retrieve the user by user_id
-        user = User.query.get(user_id)
-        if not user:
-            return {'error': 'User not found'}, 404
-
-        # Find the cart associated with the user
-        cart = Cart.query.filter_by(user_id=user.id).first()
-        if not cart:
-            return {'error': 'Cart not found'}, 404
-
-        # Find the cart item that matches the given artwork_id
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-        if not cart_item:
-            return {'error': 'Artwork not found in cart'}, 404
-
-        # Remove the cart item if its quantity is 1; otherwise, reduce the quantity
-        if cart_item.quantity > 1:
-            cart_item.quantity -= 1
+        if current_user:
+            cart_query = cart_query.filter_by(user_id=current_user)
         else:
-            db.session.delete(cart_item)
+            cart_query = cart_query.filter_by(sess=session_key)
+        
+        cart = cart_query.first()
 
-        # Commit the changes to the database
+        if not cart:
+            return {"error": "Active cart not found"}, 404
+
+        # Fetch the CartItem by id
+        cart_item = CartItem.query.filter_by(artwork_id=item_id, cart_id=cart.id).first()
+
+        if not cart_item:
+            return {"error": "Cart item not found"}, 404
+
+        # Delete the CartItem from the database
+        db.session.delete(cart_item)
         db.session.commit()
 
-        return {'message': 'Artwork removed from cart'}, 200
+        # Fetch all remaining items related to the active cart
+        all_cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+        serialized_items = [item.to_dict() for item in all_cart_items]
 
-
-
+        return {
+            "message": "Cart item deleted successfully",
+            "cart_items": serialized_items
+        }, 200
 
 
 class ViewCartResource(Resource):
-    def get(self, user_id):
-        # Fetch the cart for the specified user
-        cart = Cart.query.filter_by(user_id=user_id).first()
+    def get(self):
+        verify_jwt_in_request(optional=True)
+        current_user = get_jwt_identity()
+        session_key = request.cookies.get('session')
+
+        # Fetch the active cart based on user or session key
+        cart_query = Cart.query.filter_by(is_active=True)
+        
+        if current_user:
+            cart_query = cart_query.filter_by(user_id=current_user)
+        else:
+            cart_query = cart_query.filter_by(sess=session_key)
+        
+        cart = cart_query.first()
+
         if not cart:
-            return {'error': 'Cart not found'}, 404
+            return {"error": "Active cart not found"}, 404
+        
+        # Fetch all remaining items related to the active cart
+        all_cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+        serialized_items = [item.to_dict() for item in all_cart_items]
+        
 
-        # Fetch all items in the cart
-        cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-
-        # Serialize cart items to a list of dictionaries
-        serialized_cart_items = [
-            {
-                'id': item.id,
-                'name': item.title,
-                'quantity': item.quantity,
-                'price': item.price,
-                'image': item.image,
-                'description': item.description
-            }
-            for item in cart_items
-        ]
-
-        # Return the list of cart items
         return {
-            'cart_items': serialized_cart_items
+            "message": "Cart fetched successfully",
+            "cart_items": serialized_items
         }, 200
-
-    
-# @app.route('/messages', methods=['POST'])
-# @jwt_required()
-# def send_message():
-#     data = request.json
-#     recipient_id = data.get('recipient_id')
-#     message_text = data.get('message')
-#     sender_id = get_jwt_identity()
-
-#     if not recipient_id or not message_text:
-#         return jsonify({"error": "Invalid data"}), 400
-
-#     new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
-#     db.session.add(new_message)
-#     db.session.commit()
-
-#     socketio.emit('new_message', {
-#         'sender_id': sender_id,
-#         'recipient_id': recipient_id,
-#         'content': message_text,
-#         'sent_at': new_message.sent_at.isoformat()
-#     })
-
-#     return jsonify({
-#         'id': new_message.id,
-#         'sender_id': sender_id,
-#         'recipient_id': recipient_id,
-#         'content': message_text,
-#         'sent_at': new_message.sent_at.isoformat()
-#     }), 201
-
 
 class Home(Resource):
     def get(self):
@@ -769,6 +727,7 @@ def create_payment(payment_data):
         return {'message': 'Payment initiated successfully'}, 201
     else:
         return {'error': 'Failed to initiate payment'}, 400
+    
 class ArtworkCheckoutResource(Resource):
     @staticmethod
     def initiate_mpesa_payment(payment_data):
@@ -955,10 +914,6 @@ class ArtworkCheckoutResource(Resource):
             return {'error': 'An error occurred while processing the order'}, 500
 
 
-
-
-
-
 @app.route('/callback', methods=['POST'])
 def mpesa_callback():
     data = request.get_json()
@@ -1007,8 +962,6 @@ def mpesa_callback():
 
 
         
-
-
 
 @app.route('/messages', methods=['POST'])
 @jwt_required()
@@ -1190,15 +1143,15 @@ api.add_resource(EventsResource, '/events', '/events/<int:id>', '/events/<int:us
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
-api.add_resource(UpdateCartItemResource, '/update_cart_item')
-api.add_resource(RemoveFromCartResource, '/remove_from_cart')
+api.add_resource(UpdateCartItemResource, '/update_cart_item/<int:item_id>')
+api.add_resource(RemoveFromCartResource, '/remove_from_cart/<int:item_id>')
 
 api.add_resource(MessageResource, '/messages')
 api.add_resource(PaymentResource, '/payments')
 # api.add_resource(PaymentSearchResource, '/payments/search')
 api.add_resource(ArtworkByOrderResource, '/artworks/order/<int:order_id>')
 
-api.add_resource(ViewCartResource, '/view_cart/<int:user_id>')
+api.add_resource(ViewCartResource, '/view_cart')
 api.add_resource(EventCheckoutResource, '/eventcheckout')
 api.add_resource(ArtworkCheckoutResource, '/artworkcheckout')
 api.add_resource(BookingResource, '/bookings', '/bookings/<int:id>', '/bookings/<int:user_id>')
@@ -1219,4 +1172,3 @@ logging.basicConfig(level=logging.DEBUG)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5555)
-
