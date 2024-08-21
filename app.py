@@ -61,7 +61,7 @@ mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 # sio = Server(cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
 # app.mount("/", ASGIApp(sio, other_asgi_app=app))
-socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app"])
+socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app"], async_mode='eventlet')
 
 
 ma = Marshmallow(app)
@@ -1172,4 +1172,4 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5555)
+    socketio.run(app, host='0.0.0.0', port=5000)
