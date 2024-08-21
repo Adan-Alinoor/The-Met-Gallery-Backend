@@ -943,9 +943,9 @@ class ArtworkCheckoutResource(Resource):
                     artwork_id=artwork_id,
                     quantity=quantity,
                     price=cart_item.price,
-                    title=cart_item.title,  # Ensure title is passed here
-                    description=cart_item.description,  # Include other fields if necessary
-                    image=cart_item.image  # Include other fields if necessary
+                    # title=cart_item.title,  # Ensure title is passed here
+                    # description=cart_item.description,  # Include other fields if necessary
+                    # image=cart_item.image  # Include other fields if necessary
                 )
                 db.session.add(order_item)
 
