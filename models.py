@@ -130,7 +130,7 @@ class CartItem(db.Model, SerializerMixin):
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Numeric, nullable=False)
+    price = db.Column(db.Integer, nullable=True)
     
     
     
@@ -141,6 +141,7 @@ class CartItem(db.Model, SerializerMixin):
             'cart': self.cart.to_dict(),
             'artwork_id': self.artwork_id,
             'quantity': self.quantity,
+            "price": self.price,
             'artwork': self.artwork.to_dict() if self.artwork else None  # Add artwork data if it exists, else return None
         }
 
