@@ -559,12 +559,13 @@ def add_to_cart(cart, artwork_id, quantity):
             cart_id=cart.id,
             artwork_id=artwork_id,
             quantity=quantity,
-            price=artwork.price  # Set the price from the artwork
+            price=artwork.price
         )
         db.session.add(cart_item)
 
     db.session.commit()
     return {'message': 'Item added to cart'}, 201
+
 
 
 
