@@ -1,7 +1,7 @@
 from flask_restful import Resource, reqparse
 from flask import jsonify, request, make_response
 from datetime import datetime
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity,verify_jwt_in_request
 import logging
 
 from models import db, Event, Ticket, User, UserActivity
@@ -18,6 +18,7 @@ event_parser.add_argument('location', type=str, required=True, help='Location is
 class EventsResource(Resource):
     def get(self, id=None):
         try:
+            verify_jwt_in_request(optional=True)
             current_user_id = get_jwt_identity()
             user_specific = request.args.get('user_specific', 'false').lower() == 'true'
 
