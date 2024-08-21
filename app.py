@@ -481,7 +481,7 @@ class AddToCartResource(Resource):
         artwork_id = data.get('artwork_id')
         quantity = data.get('quantity', 1)
 
-        # Fetch artwork price from the database or another source
+        # Fetch artwork price from the database
         artwork = Artwork.query.get(artwork_id)
         if not artwork:
             return {'error': 'Artwork not found'}, 404
@@ -508,6 +508,7 @@ class AddToCartResource(Resource):
         db.session.commit()
 
         return {"message": "Item added to cart successfully", "cart_id": active_cart.id}, 200
+
 
 
 # class AddToCartResource(Resource):
