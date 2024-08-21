@@ -446,55 +446,6 @@ class ArtworkByOrderResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-# class AddToCartResource(Resource):
-#     def post(self):
-#         verify_jwt_in_request(optional=True)
-#         # Get the current user ID if logged in
-#         current_user_id = get_jwt_identity()
-
-#         if current_user_id:
-#             # If the user is logged in, find or create an active cart for the user
-#             active_cart = Cart.query.filter_by(user_id=current_user_id, is_active=True).first()
-#             if not active_cart:
-#                 active_cart = Cart(user_id=current_user_id, is_active=True)
-#                 db.session.add(active_cart)
-#                 db.session.commit()
-#         else:
-#             # If the user is not logged in, use a session key
-#             sess = request.cookies.get('session_key')
-#             if not sess:
-#                 # Generate a session key if not already present
-#                 session_key = str(uuid.uuid4())
-#                 response = make_response()
-#                 response.set_cookie('session_key', session_key)
-
-#             # Find or create an active cart for the session
-#             active_cart = Cart.query.filter_by(sess=sess, is_active=True).first()
-#             if not active_cart:
-#                 active_cart = Cart(sess=sess, is_active=True)
-#                 db.session.add(active_cart)
-#                 db.session.commit()
-
-#         # Extract the artwork_id and quantity from the post data
-#         data = request.get_json()
-#         artwork_id = data.get('artwork_id')
-#         quantity = data.get('quantity', 1)
-
-#         # Check if the item already exists in the cart
-#         cart_item = CartItem.query.filter_by(cart_id=active_cart.id, artwork_id=artwork_id).first()
-#         if cart_item:
-#             # If it exists, update the quantity
-#             cart_item.quantity += quantity
-#         else:
-#             # If it doesn't exist, create a new cart item
-#             cart_item = CartItem(cart_id=active_cart.id, artwork_id=artwork_id, quantity=quantity)
-#             db.session.add(cart_item)
-
-#         db.session.commit()
-
-#         return {"message": "Item added to cart successfully", "cart_id": active_cart.id}, 200
-
-
 class AddToCartResource(Resource):
     def post(self):
         verify_jwt_in_request(optional=True)
@@ -516,8 +467,6 @@ class AddToCartResource(Resource):
                 session_key = str(uuid.uuid4())
                 response = make_response()
                 response.set_cookie('session_key', session_key)
-                response.headers['Content-Type'] = 'application/json'  # Ensure the response is JSON
-                return response
 
             # Find or create an active cart for the session
             active_cart = Cart.query.filter_by(sess=sess, is_active=True).first()
@@ -531,34 +480,85 @@ class AddToCartResource(Resource):
         artwork_id = data.get('artwork_id')
         quantity = data.get('quantity', 1)
 
-        # Use the helper function to add the item to the cart, including the price
-        result = add_to_cart(active_cart, artwork_id, quantity)
+        # Check if the item already exists in the cart
+        cart_item = CartItem.query.filter_by(cart_id=active_cart.id, artwork_id=artwork_id).first()
+        if cart_item:
+            # If it exists, update the quantity
+            cart_item.quantity += quantity
+        else:
+            # If it doesn't exist, create a new cart item
+            cart_item = CartItem(cart_id=active_cart.id, artwork_id=artwork_id, quantity=quantity)
+            db.session.add(cart_item)
 
-        if 'error' in result:
-            return result, 404
+        db.session.commit()
 
         return {"message": "Item added to cart successfully", "cart_id": active_cart.id}, 200
 
 
-def add_to_cart(cart, artwork_id, quantity):
-    artwork = Artwork.query.get(artwork_id)
-    if not artwork:
-        return {'error': 'Artwork not found'}, 404
+# class AddToCartResource(Resource):
+#     def post(self):
+#         verify_jwt_in_request(optional=True)
+#         # Get the current user ID if logged in
+#         current_user_id = get_jwt_identity()
 
-    cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-    if cart_item:
-        cart_item.quantity += quantity
-    else:
-        cart_item = CartItem(
-            cart_id=cart.id,
-            artwork_id=artwork_id,
-            quantity=quantity,
-            price=artwork.price
-        )
-        db.session.add(cart_item)
+#         if current_user_id:
+#             # If the user is logged in, find or create an active cart for the user
+#             active_cart = Cart.query.filter_by(user_id=current_user_id, is_active=True).first()
+#             if not active_cart:
+#                 active_cart = Cart(user_id=current_user_id, is_active=True)
+#                 db.session.add(active_cart)
+#                 db.session.commit()
+#         else:
+#             # If the user is not logged in, use a session key
+#             sess = request.cookies.get('session_key')
+#             if not sess:
+#                 # Generate a session key if not already present
+#                 session_key = str(uuid.uuid4())
+#                 response = make_response()
+#                 response.set_cookie('session_key', session_key)
+#                 response.headers['Content-Type'] = 'application/json'  # Ensure the response is JSON
+#                 return response
 
-    db.session.commit()
-    return {'message': 'Item added to cart'}, 201
+#             # Find or create an active cart for the session
+#             active_cart = Cart.query.filter_by(sess=sess, is_active=True).first()
+#             if not active_cart:
+#                 active_cart = Cart(sess=sess, is_active=True)
+#                 db.session.add(active_cart)
+#                 db.session.commit()
+
+#         # Extract the artwork_id and quantity from the post data
+#         data = request.get_json()
+#         artwork_id = data.get('artwork_id')
+#         quantity = data.get('quantity', 1)
+
+#         # Use the helper function to add the item to the cart, including the price
+#         result = add_to_cart(active_cart, artwork_id, quantity)
+
+#         if 'error' in result:
+#             return result, 404
+
+#         return {"message": "Item added to cart successfully", "cart_id": active_cart.id}, 200
+
+
+# def add_to_cart(cart, artwork_id, quantity):
+#     artwork = Artwork.query.get(artwork_id)
+#     if not artwork:
+#         return {'error': 'Artwork not found'}, 404
+
+#     cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+#     if cart_item:
+#         cart_item.quantity += quantity
+#     else:
+#         cart_item = CartItem(
+#             cart_id=cart.id,
+#             artwork_id=artwork_id,
+#             quantity=quantity,
+#             price=artwork.price
+#         )
+#         db.session.add(cart_item)
+
+#     db.session.commit()
+#     return {'message': 'Item added to cart'}, 201
 
 
 
