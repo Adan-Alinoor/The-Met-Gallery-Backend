@@ -61,7 +61,8 @@ mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 # sio = Server(cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
 # app.mount("/", ASGIApp(sio, other_asgi_app=app))
-socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-nbi7.vercel.app"])
+socketio = SocketIO(app, cors_allowed_origins=["https://the-met-gallery-frontend-wh3n.vercel.app"])
+
 
 ma = Marshmallow(app)
 
