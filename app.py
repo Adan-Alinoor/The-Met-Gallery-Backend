@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify, make_response, session
 from flask_restful import Api, Resource,reqparse
 from flask_migrate import Migrate
@@ -45,8 +48,6 @@ app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=12)
 CALLBACK_SECRET = 'your_secret_key_here'
-
-
 
 
 
