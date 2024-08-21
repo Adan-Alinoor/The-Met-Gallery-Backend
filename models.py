@@ -172,7 +172,7 @@ class OrderItem(db.Model, SerializerMixin):
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     price = db.Column(db.Integer, nullable=False)
-    title = db.Column(db.String, nullable=False)
+    title = db.Column(db.String, nullable=True)
     description = db.Column(db.Text, nullable=True)
     image = db.Column(db.String, nullable=True)
 
