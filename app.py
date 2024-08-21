@@ -14,7 +14,7 @@ from flask_marshmallow import Marshmallow
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
-import os
+import o
 from flask import Flask, request, jsonify
 import requests
 import uuid
