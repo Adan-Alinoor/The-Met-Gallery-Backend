@@ -130,6 +130,8 @@ class CartItem(db.Model, SerializerMixin):
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
+    price = db.Column(db.Numeric, nullable=False)
+    
     
     
     def to_dict(self):

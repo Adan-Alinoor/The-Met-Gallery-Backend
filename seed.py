@@ -63,28 +63,28 @@ def seed_users():
 
 def seed_events():
     events_data = [
-    {
-        "title": "The Grief Paintings",
-        "image_url": "https://i.ibb.co/z8H2jLW/314974429fd5a0490f70a01b441a684c.jpg",
-        "description": "An exhibition of new paintings by Helen Marden, created with resin, powdered pigment, ink, and natural objects, reflecting on life, love, and creativity.",
-        "start_date": date(2024, 7, 24),
-        "end_date": date(2024, 9, 14),
-        "user_id": 1,
-        "time": time(10, 0),
-        "created_at": datetime.utcnow(),
-        "location": "Gagosian 821 Park Avenue New York, NY USA",
-    },
-    {
-        "title": "A Black Revolutionary Artist",
-        "image_url": "https://i.ibb.co/nfSC3Tg/elizabeth-catlett-black-unity.jpg",
-        "description": "Showcasing over 150 works by Elizabeth Catlett, this exhibition explores her career from DC to Mexico, highlighting her focus on social justice.",
-        "start_date": date(2024, 9, 13),
-        "end_date": date(2025, 1, 19),
-        "user_id": 2,
-        "time": time(20, 0),
-        "created_at": datetime.utcnow(),
-        "location": "Brooklyn Museum of Art",
-    },
+        {
+            "title": "The Grief Paintings",
+            "image_url": "https://i.ibb.co/z8H2jLW/314974429fd5a0490f70a01b441a684c.jpg",
+            "description": "An exhibition of new paintings by Helen Marden, created with resin, powdered pigment, ink, and natural objects, reflecting on life, love, and creativity.",
+            "start_date": date(2024, 7, 24),
+            "end_date": date(2024, 9, 14),
+            "user_id": 1,
+            "time": time(10, 0),
+            "created_at": datetime.utcnow(),
+            "location": "Gagosian 821 Park Avenue New York, NY USA",
+        },
+        {
+            "title": "A Black Revolutionary Artist",
+            "image_url": "https://i.ibb.co/nfSC3Tg/elizabeth-catlett-black-unity.jpg",
+            "description": "Showcasing over 150 works by Elizabeth Catlett, this exhibition explores her career from DC to Mexico, highlighting her focus on social justice.",
+            "start_date": date(2024, 9, 13),
+            "end_date": date(2025, 1, 19),
+            "user_id": 2,
+            "time": time(20, 0),
+            "created_at": datetime.utcnow(),
+            "location": "Brooklyn Museum of Art",
+        },
     {
         "title": "Summer Album",
         "image_url": "https://i.pinimg.com/474x/65/d4/6d/65d46d7471604b28b9a113a16326b69d.jpg",
@@ -316,187 +316,204 @@ def seed_events():
         "created_at": datetime(2024, 8, 12),
         "location": "The Fantasy Art Museum, San Francisco, CA, USA"
     }
-]
-    
+        # Add other events here
+    ]
+
     with app.app_context():
         logging.info("Seeding events...")
         for event_data in events_data:
             try:
-                start_date = datetime.strptime(event_data["start_date"], "%d-%m-%Y").date()
-                end_date = datetime.strptime(event_data["end_date"], "%d-%m-%Y").date()
-                event_time = datetime.strptime(event_data["time"], "%H:%M:%S").time()
-
                 event = Event(
                     title=event_data["title"],
                     image_url=event_data["image_url"],
                     description=event_data["description"],
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=event_data["start_date"],
+                    end_date=event_data["end_date"],
                     user_id=event_data["user_id"],
-                    time=event_time,
-                    location=event_data["location"],
-                    created_at=datetime.utcnow()
+                    time=event_data["time"],
+                    created_at=event_data["created_at"],
+                    location=event_data["location"]
                 )
                 db.session.add(event)
+                db.session.commit()
+                logging.info(f"Event '{event.title}' added successfully.")
             except Exception as e:
-                logging.error(f"Error adding event {event_data['title']}: {e}")
+                logging.error(f"Error adding event '{event_data['title']}': {e}")
+                db.session.rollback()
 
-        try:
-            db.session.commit()
-            logging.info("Events seeded.")
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error committing to database: {e}")
 
 def seed_artworks():
     artworks_data = [
-         {
-        "title": "Sigma Art",
-        "description": "As New Year 2015 begins, here are incredible Digital art and illustrations by professional artists and designers. The amazing illustration artwork that will.",
-        "price": 1,
-        'user_id': 1,
-        "image": "https://i.pinimg.com/564x/4e/b1/c9/4eb1c9f1104ef8bb36967bd0d1b3c449.jpg"
-    },
-    {
-        "title": "Colorful Beagle",
-        "description": "Colorful Beagle illustration wearing sunglasses. With ink dripping from the bottom. This design is perfect for any Beagle dog lover.",
-        "price": 1,
-        'user_id': 2,
-        "image": "https://i.pinimg.com/564x/0f/15/3d/0f153dde7df00dcbf8674f820eba855a.jpg"
-    },
-    {
-        "title": "Inspiration Grid",
-        "description": "Amsterdam-based art director Quentin Deronzier draws inspiration from the 80s visual aesthetic to create this spellbinding series of digital artwork",
-        "price": 120000000,
-        'user_id': 3,
-        "image": "https://i.pinimg.com/564x/7a/b9/2d/7ab92dc75591dc8a86d045e0c1081c1a.jpg"
-    },
-    {
-        "title": "The Maja",
-        "description": "Graceful Flowery Collages  Fubiz Media",
-        "price": 6000000,
-        'user_id': 4,
-        "image": "https://i.pinimg.com/236x/9c/c1/48/9cc148fe735288c77c6506c3a595fa49.jpg"
-    },
-    {
-        "title": "Nature's Simplicity",
-        "description": "Behold the minimalist elegance of nature in this singular artwork. With only two tones and flat shading, it celebrates the sheer simplicity of the natural world.",
-        "price": 7000000,
-        'user_id': 5,
-        "image": "https://i.pinimg.com/564x/47/25/6a/47256ab8b281d7e4208443c4c2a252e2.jpg"
-    },
-    {
-        "title": "The Night Watch",
-        "description": "A painting by Rembrandt, portraying a group of trees.",
-        "price": 45000000,
-        'user_id': 6,
-        "image": "https://i.pinimg.com/564x/52/bf/c2/52bfc20b0308f5b31bf1103fa2230bcc.jpg"
-    },
-    {
-        "title": "The Natures Essence",
-        "description": "An anti-war painting by Pablo Picasso, reflecting the bombing of Guernica.",
-        "price": 200000000,
-        'user_id':"https://i.pinimg.com/236x/0c/18/41/0c184144f417600378f2e5e9b9bff9f4.jpg"
-    },
-    {
-        "title": "The Vibrant Hibiscus",
-        "description": "A painting by Sandro Botticelli, depicting Venus emerging from the sea.",
-        "price": 100000000,
-        'user_id': 6,
-        "image": "https://i.pinimg.com/236x/47/8d/4f/478d4f22a0d7ab798f4394af7c93cf62.jpg"
-    },
-    {
-        "title": "The Kiss",
-        "description": "A painting by Gustav Klimt, representing an intimate embrace.",
-        "price": 150000000,
-        'user_id': 5,
-        "image": "https://i.pinimg.com/564x/f1/34/07/f13407656ee72abc7461823449d4423d.jpg"
-    },
-    {
-        "title": "America Colorful",
-        "description": "A painting by Grant Wood, showing a farmer and his daughter.",
-        "price": 30000000,
-        'user_id': 4,
-        "image": "https://i.pinimg.com/564x/ba/3b/60/ba3b6075fd2d5340341f5f0d07188d5c.jpg"
-    },
-    {
-        "title": "The Arnolfini Portrait",
-        "description": "A painting by Jan van Eyck, featuring a double portrait of Giovanni di Nicolao di Arnolfini and his wife.",
-        "price": 20000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/ZjvTs9J/Arnolfini-Portrait.jpg"
-    },
-    {
-        "title": "Water Lilies",
-        "description": "A series of approximately 250 oil paintings by Claude Monet, depicting his flower garden at Giverny.",
-        "price": 8000000,
-        'user_id': 2,
-        "image": "https://i.ibb.co/zGc8Pmj/waterlilies.jpg"
-    },
-    {
-        "title": "The Last Supper",
-        "description": "A late 15th-century mural painting by Leonardo da Vinci, housed by the Convent of Santa Maria delle Grazie in Milan.",
-        "price": 450000000,
-        'user_id': 2,
-        "image": "https://i.pinimg.com/564x/b4/e9/8b/b4e98bb1f24707e8e3fddb1698267b24.jpg"
-    },
-    {
-        "title": "Liberty Leading the People",
-        "description": "A painting by Eugène Delacroix commemorating the July Revolution of 1830 in France.",
-        "price": 50000000,
-        'user_id': 2,
-        "image": "https://i.ibb.co/rfnFKXD/La-Libert-guidant.jpg"
-    },
-    {
-        "title": "The Hay Wain",
-        "description": "A painting by John Constable, showing a rural scene on the River Stour between the English counties of Suffolk and Essex.",
-        "price": 10000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/7nKMrhx/The-Hay-Wain-1821.jpg"
-    },
-    {
-        "title": "The Garden of Earthly Delights",
-        "description": "A triptych by the Early Netherlandish painter Hieronymus Bosch, depicting the Garden of Eden and the Last Judgment.",
-        "price": 80000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/9nZrC4G/The-Garden-of-earthly-delights.jpg"
-    },
-    {
-        "title": "The School of Athens",
-        "description": "A fresco by the Italian Renaissance artist Raphael, representing philosophy.",
-        "price": 100000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/yFNzSsS/The-School-of-Athens-by-Raffaello-Sanzio-da-Urbino.jpg"
-    },
-    {
-        "title": "The Wanderer above the Sea of Fog",
-        "description": "An oil painting by German Romantic artist Caspar David Friedrich, depicting a man standing on a rocky promontory.",
-        "price": 6000000,
-        'user_id': 2,
-        "image": "https://i.ibb.co/4W2x7XW/Wanderer-above-the-Sea-of-Fog.jpg"
-    },
-    {
-        "title": "Las Meninas",
-        "description": "A painting by Diego Velázquez, depicting the Infanta Margarita Teresa surrounded by her entourage.",
-        "price": 200000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/zmjF5XM/Las-Meninas.jpg"
-    },
-    {
-        "title": "Whistler's Mother",
-        "description": "An 1871 painting by American-born artist James McNeill Whistler, depicting his mother, Anna McNeill Whistler.",
-        "price": 35000000,
-        'user_id': 3,
-        "image": "https://i.ibb.co/k6ybRGc/Whistlers-Mother-high-res.jpg"
-    },
-    {
-        "title": "A Sunday Afternoon on the Island of La Grande Jatte",
-        "description": "A painting by Georges Seurat, depicting people relaxing in a suburban park on an island in the Seine River.",
-        "price": 8000000,
-        'user_id': 1,
-        "image": "https://i.ibb.co/7rSCy8Q/sunday-afternoon.jpg"
-    },
-    {
+        {
+            "title": "Sigma Art",
+            "description": "As New Year 2015 begins, here are incredible Digital art and illustrations by professional artists and designers. The amazing illustration artwork that will.",
+            "price": 1,
+            'user_id': 1,
+            "image": "https://i.pinimg.com/564x/4e/b1/c9/4eb1c9f1104ef8bb36967bd0d1b3c449.jpg"
+        },
+        {
+            "title": "Colorful Beagle",
+            "description": "Colorful Beagle illustration wearing sunglasses. With ink dripping from the bottom. This design is perfect for any Beagle dog lover.",
+            "price": 1,
+            'user_id': 2,
+            "image": "https://i.pinimg.com/564x/0f/15/3d/0f153dde7df00dcbf8674f820eba855a.jpg"
+        },
+        # ... other artworks ...
+        {
+            "title": "The Thinker",
+            "description": "A bronze sculpture by Auguste Rodin, representing a man in sober meditation battling with a powerful internal struggle.",
+            "price": 14000,
+            "user_id": 1,
+            "image": "https://i.pinimg.com/236x/6d/ea/3f/6dea3ff46eef9cffe000280f7c683db4.jpg"
+        },
+        {
+            "title": "The Maja",
+            "description": "Graceful Flowery Collages  Fubiz Media",
+            "price": 6000000,
+            'user_id': 4,
+            "image": "https://i.pinimg.com/236x/9c/c1/48/9cc148fe735288c77c6506c3a595fa49.jpg"
+        },
+        {
+            "title": "Nature's Simplicity",
+            "description": "Behold the minimalist elegance of nature in this singular artwork. With only two tones and flat shading, it celebrates the sheer simplicity of the natural world.",
+            "price": 7000000,
+            'user_id': 5,
+            "image": "https://i.pinimg.com/564x/47/25/6a/47256ab8b281d7e4208443c4c2a252e2.jpg"
+        },
+        {
+            "title": "The Night Watch",
+            "description": "A painting by Rembrandt, portraying a group of trees.",
+            "price": 45000000,
+            'user_id': 6,
+            "image": "https://i.pinimg.com/564x/52/bf/c2/52bfc20b0308f5b31bf1103fa2230bcc.jpg"
+        },
+        {
+            "title": "The Natures Essence",
+            "description": "An anti-war painting by Pablo Picasso, reflecting the bombing of Guernica.",
+            "price": 200000000,
+            'user_id': 5,
+            "image": "https://i.pinimg.com/236x/0c/18/41/0c184144f417600378f2e5e9b9bff9f4.jpg"
+        },
+        {
+            "title": "The Vibrant Hibiscus",
+            "description": "A painting by Sandro Botticelli, depicting Venus emerging from the sea.",
+            "price": 100000000,
+            'user_id': 6,
+            "image": "https://i.pinimg.com/236x/47/8d/4f/478d4f22a0d7ab798f4394af7c93cf62.jpg"
+        },
+        {
+            "title": "The Kiss",
+            "description": "A painting by Gustav Klimt, representing an intimate embrace.",
+            "price": 150000000,
+            'user_id': 5,
+            "image": "https://i.pinimg.com/564x/f1/34/07/f13407656ee72abc7461823449d4423d.jpg"
+        },
+        {
+            "title": "America Colorful",
+            "description": "A painting by Grant Wood, showing a farmer and his daughter.",
+            "price": 30000000,
+            'user_id': 4,
+            "image": "https://i.pinimg.com/564x/ba/3b/60/ba3b6075fd2d5340341f5f0d07188d5c.jpg"
+        },
+        {
+            "title": "The Arnolfini Portrait",
+            "description": "A painting by Jan van Eyck, featuring a double portrait of Giovanni di Nicolao di Arnolfini and his wife.",
+            "price": 20000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/4W2x7XW/Wanderer-above-the-Sea-of-Fog.jpg"
+        },
+        {
+            "title": "Water Lilies",
+            "description": "A series of approximately 250 oil paintings by Claude Monet, depicting his flower garden at Giverny.",
+            "price": 8000000,
+            'user_id': 2,
+            "image": "https://i.ibb.co/zGc8Pmj/waterlilies.jpg"
+        },
+        {
+            "title": "The Last Supper",
+            "description": "A late 15th-century mural painting by Leonardo da Vinci, housed by the Convent of Santa Maria delle Grazie in Milan.",
+            "price": 450000000,
+            'user_id': 2,
+            "image": "https://i.pinimg.com/564x/b4/e9/8b/b4e98bb1f24707e8e3fddb1698267b24.jpg"
+        },
+        {
+            "title": "Liberty Leading the People",
+            "description": "A painting by Eugène Delacroix commemorating the July Revolution of 1830 in France.",
+            "price": 50000000,
+            'user_id': 2,
+            "image": "https://i.ibb.co/rfnFKXD/La-Libert-guidant.jpg"
+        },
+        {
+            "title": "The Hay Wain",
+            "description": "A painting by John Constable, showing a rural scene on the River Stour between the English counties of Suffolk and Essex.",
+            "price": 10000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/7nKMrhx/The-Hay-Wain-1821.jpg"
+        },
+        {
+            "title": "The Garden of Earthly Delights",
+            "description": "A triptych by the Early Netherlandish painter Hieronymus Bosch, depicting the Garden of Eden and the Last Judgment.",
+            "price": 80000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/9nZrC4G/The-Garden-of-earthly-delights.jpg"
+        },
+        {
+            "title": "The School of Athens",
+            "description": "A fresco by the Italian Renaissance artist Raphael, representing philosophy.",
+            "price": 100000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/yFNzSsS/The-School-of-Athens-by-Raffaello-Sanzio-da-Urbino.jpg"
+        },
+        {
+            "title": "The Wanderer above the Sea of Fog",
+            "description": "An oil painting by German Romantic artist Caspar David Friedrich, depicting a man standing on a rocky promontory.",
+            "price": 6000000,
+            'user_id': 2,
+            "image": "https://i.ibb.co/4W2x7XW/Wanderer-above-the-Sea-of-Fog.jpg"
+        },
+        {
+            "title": "Las Meninas",
+            "description": "A painting by Diego Velázquez, depicting the Infanta Margarita Teresa surrounded by her entourage.",
+            "price": 200000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/zmjF5XM/Las-Meninas.jpg"
+        },
+        {
+            "title": "Whistler's Mother",
+            "description": "An 1871 painting by American-born artist James McNeill Whistler, depicting his mother, Anna McNeill Whistler.",
+            "price": 35000000,
+            'user_id': 3,
+            "image": "https://i.ibb.co/k6ybRGc/Whistlers-Mother-high-res.jpg"
+        },
+        {
+            "title": "A Sunday Afternoon on the Island of La Grande Jatte",
+            "description": "A painting by Georges Seurat, depicting people relaxing in a suburban park on an island in the Seine River.",
+            "price": 8000000,
+            'user_id': 1,
+            "image": "https://i.ibb.co/7rSCy8Q/sunday-afternoon.jpg"
+        },
+        {
+            "title": "Nighthawks",
+            "description": "A painting by Edward Hopper, portraying people in a downtown diner late at night.",
+            "price": 9000000,
+            'user_id': 1,
+            "image": "https://i.ibb.co/zmjF5XM/Las-Meninas.jpg"
+        },
+        {
+            "title": "Girl with a Pearl Earring",
+            "description": "A painting by Johannes Vermeer, depicting a girl wearing an exotic dress, an oriental turban, and a large pearl earring.",
+            "price": 20000000,
+            'user_id': 2,
+            "image": "https://i.ibb.co/k6ybRGc/Whistlers-Mother-high-res.jpg"
+        },
+        {
+            "title": "The Thinker",
+            "description": "A bronze sculpture by Auguste Rodin, depicting a man lost in thought.",
+            "price": 25000000,
+            'user_id': 4,
+            "image": "https://i.ibb.co/7rSCy8Q/sunday-afternoon.jpg"
+        }, 
+        {
         "title": "Nighthawks",
         "description": "A painting by Edward Hopper, portraying people in a downtown diner late at night.",
         "price": 9000000,
@@ -551,31 +568,30 @@ def seed_artworks():
             "price": 10000,
             'user_id': 1,
             "image": "https://i.pinimg.com/736x/1b/0c/a0/1b0ca0e42306066c0ed1d6cdcd8aec35.jpg"
-        },
-        {
-            "title": "The Thinker",
-            "description": "A bronze sculpture by Auguste Rodin, representing a man in sober meditation battling with a powerful internal struggle.",
-            "price": 14000,
-            'user_id': 1,
-            "image": "https://i.pinimg.com/236x/6d/ea/3f/6dea3ff46eef9cffe000280f7c683db4.jpg"
         }
-
     ]
-    
+
     with app.app_context():
         logging.info("Seeding artworks...")
         for artwork_data in artworks_data:
             try:
+                # Ensure user_id exists in the User table
+                user = db.session.execute(db.select(User).filter_by(id=artwork_data['user_id'])).scalars().first()
+                if not user:
+                    logging.error(f"User with ID {artwork_data['user_id']} does not exist. Skipping artwork '{artwork_data['title']}'.")
+                    continue
+
                 artwork = Artwork(
                     title=artwork_data["title"],
                     description=artwork_data["description"],
                     price=artwork_data["price"],
                     image=artwork_data["image"],
-                    created_at=datetime.utcnow()
+                    created_at=datetime.utcnow(),
+                    user_id=artwork_data["user_id"]
                 )
                 db.session.add(artwork)
             except Exception as e:
-                logging.error(f"Error adding Artwork {artworks_data['title']}: {e}")
+                logging.error(f"Error adding Artwork {artwork_data['title']}: {e}")
 
         try:
             db.session.commit()

@@ -20,9 +20,11 @@ import requests
 import uuid
 
 from flask_sqlalchemy import SQLAlchemy
+from jwt.exceptions import ExpiredSignatureError
 from flask_migrate import Migrate
+
 from flask_restful import Resource, Api, reqparse
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token, verify_jwt_in_request
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token, verify_jwt_in_request,get_jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask_cors import CORS
@@ -730,7 +732,9 @@ def create_payment(payment_data):
     else:
         return {'error': 'Failed to initiate payment'}, 400
     
-class ArtworkCheckoutResource(Resource):
+    
+  class ArtworkCheckoutResource(Resource):
+    
     @staticmethod
     def initiate_mpesa_payment(payment_data):
         if not isinstance(payment_data, dict):
@@ -784,7 +788,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://e9b4-102-214-72-2.ngrok-free.app/callback ",  
+            "CallBackURL": "https://e9b4-102-214-72-2.ngrok-free.app/callback",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -827,6 +831,10 @@ class ArtworkCheckoutResource(Resource):
     @jwt_required()
     def post(self):
         try:
+            jwt_data = get_jwt()
+            if jwt_data['exp'] < datetime.utcnow().timestamp():
+                return {'error': 'Token has expired'}, 401
+
             user_id = get_jwt_identity()
             if not user_id:
                 return {'error': 'User ID is required'}, 400
@@ -910,10 +918,196 @@ class ArtworkCheckoutResource(Resource):
                 'transaction_desc': payment_response.get('transaction_desc')
             }, 201
 
+        except ExpiredSignatureError:
+            return {'error': 'Token has expired'}, 401
         except SQLAlchemyError as e:
             db.session.rollback()
             logging.error(f'Database error: {e}')
-            return {'error': 'An error occurred while processing the order'}, 500
+            return {'error': 'An error occurred while processing the order'}, 500  
+# class ArtworkCheckoutResource(Resource):
+#     @staticmethod
+#     def initiate_mpesa_payment(payment_data):
+#         if not isinstance(payment_data, dict):
+#             logging.error(f'Expected a dictionary but got: {type(payment_data)}')
+#             return {'error': 'Invalid payment data format'}, 400
+
+#         logging.debug(f'Payment data: {payment_data}')
+
+#         user_id = payment_data.get('user_id')
+#         order_id = payment_data.get('order_id')
+#         phone_number = payment_data.get('phone_number')
+#         amount = payment_data.get('amount')
+
+#         if not all([user_id, order_id, phone_number, amount]):
+#             logging.error('Missing required fields in payment data')
+#             return {'error': 'Missing required fields'}, 400
+
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'error': 'User not found'}, 404
+
+#         order = Order.query.get(order_id)
+#         if not order:
+#             return {'error': 'Order not found'}, 404
+
+#         payment = Payment(
+#             user_id=user.id,
+#             order_id=order.id,
+#             amount=amount,
+#             phone_number=phone_number,
+#             transaction_id=None, 
+#             status='pending',
+#             created_at=datetime.now(),
+#             updated_at=datetime.now()
+#         )
+#         db.session.add(payment)
+#         db.session.commit()
+
+#         access_token = get_mpesa_access_token()
+#         headers = {
+#             'Authorization': f'Bearer {access_token}',
+#             'Content-Type': 'application/json'
+#         }
+#         password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+#         payload = {
+#             "BusinessShortCode": SHORTCODE,
+#             "Password": password,
+#             "Timestamp": timestamp,
+#             "TransactionType": "CustomerPayBillOnline",
+#             "Amount": amount,
+#             "PartyA": phone_number,
+#             "PartyB": SHORTCODE,
+#             "PhoneNumber": phone_number,
+#             "CallBackURL": "https://e9b4-102-214-72-2.ngrok-free.app/callback ",  
+#             "AccountReference": f"Order{order.id}",
+#             "TransactionDesc": "Payment for order"
+#         }
+
+#         try:
+#             response = requests.post(
+#                 "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+#                 headers=headers,
+#                 json=payload
+#             )
+
+#             logging.debug(f'M-Pesa API Response: {response.text}')
+#             response_data = response.json()
+
+#             if response_data.get('ResponseCode') == '0':
+#                 payment.transaction_id = response_data.get('CheckoutRequestID')
+#                 payment.status = 'initiated'
+#                 payment.transaction_desc = "Payment initiated successfully"
+#                 db.session.commit()
+#                 return {'message': 'Payment initiated successfully', 'transaction_desc': payment.transaction_desc}, 201
+#             else:
+#                 payment.status = 'failed'
+#                 payment.transaction_desc = response_data.get('Description', 'Payment failed')
+#                 db.session.commit()
+#                 return {'error': 'Failed to initiate payment'}, 400
+
+#         except requests.exceptions.RequestException as e:
+#             logging.error(f'Error calling M-Pesa API: {e}')
+#             payment.status = 'failed'
+#             payment.transaction_desc = 'Failed to connect to M-Pesa API'
+#             db.session.commit()
+#             return {'error': 'Failed to connect to M-Pesa API'}, 500
+#         except ValueError:
+#             logging.error(f'Invalid JSON response: {response.text}')
+#             payment.status = 'failed'
+#             payment.transaction_desc = 'Invalid response from M-Pesa API'
+#             db.session.commit()
+#             return {'error': 'Invalid response from M-Pesa API'}, 500
+
+#     @jwt_required()
+#     def post(self):
+#         try:
+#             user_id = get_jwt_identity()
+#             if not user_id:
+#                 return {'error': 'User ID is required'}, 400
+
+#             data = request.get_json()
+#             if not data:
+#                 return {'error': 'No input data provided'}, 400
+
+#             phone_number = data.get('phone_number')
+#             if not phone_number:
+#                 return {'error': 'Phone number is required'}, 400
+
+#             selected_items = data.get('items', [])
+#             if not selected_items:
+#                 return {'error': 'No items selected for checkout'}, 400
+
+#             user = User.query.get(user_id)
+#             if not user:
+#                 return {'error': 'User not found'}, 404
+
+#             cart = Cart.query.filter_by(user_id=user.id).first()
+#             if not cart or not cart.items:
+#                 return {'error': 'Cart is empty'}, 400
+
+#             total_amount = 0
+#             for selected_item in selected_items:
+#                 artwork_id = selected_item.get('artwork_id')
+#                 quantity = selected_item.get('quantity', 1)
+
+#                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+#                 if not cart_item or cart_item.quantity < quantity:
+#                     return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
+
+#                 total_amount += cart_item.price * quantity
+
+#             # Create the order with the total amount
+#             order = Order(user_id=user.id, total_price=total_amount)
+#             db.session.add(order)
+#             db.session.flush()  # Ensure the order.id is available
+
+#             for selected_item in selected_items:
+#                 artwork_id = selected_item.get('artwork_id')
+#                 quantity = selected_item.get('quantity', 1)
+
+#                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
+
+#                 order_item = OrderItem(
+#                     order_id=order.id,
+#                     artwork_id=artwork_id,
+#                     quantity=quantity,
+#                     price=cart_item.price,
+#                     title=cart_item.title,  # Ensure title is passed here
+#                     description=cart_item.description,  # Include other fields if necessary
+#                     image=cart_item.image  # Include other fields if necessary
+#                 )
+#                 db.session.add(order_item)
+
+#                 if cart_item.quantity > quantity:
+#                     cart_item.quantity -= quantity
+#                 else:
+#                     db.session.delete(cart_item)
+
+#             db.session.commit()
+
+#             payment_data = {
+#                 'user_id': user.id,
+#                 'order_id': order.id,
+#                 'phone_number': phone_number,
+#                 'amount': total_amount
+#             }
+
+#             payment_response, status_code = self.initiate_mpesa_payment(payment_data)
+
+#             if status_code != 201:
+#                 db.session.rollback()
+#                 return payment_response, 400
+
+#             return {
+#                 'message': 'Order created and payment initiated successfully',
+#                 'order_id': order.id,
+#                 'transaction_desc': payment_response.get('transaction_desc')
+#             }, 201
+
+#         except SQLAlchemyError as e:
+#             db.session.rollback()
+#             logging.error(f'Database error: {e}')
+#             return {'error': 'An error occurred while processing the order'}, 500
 
 
 @app.route('/callback', methods=['POST'])
