@@ -115,7 +115,9 @@ class Ticket(db.Model, SerializerMixin):
 class Cart(db.Model, SerializerMixin):
     __tablename__ = 'carts'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    sess = db.Column(db.String, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
     
     user = db.relationship('User', back_populates='cart')
     items = db.relationship('CartItem', back_populates='cart', cascade='all, delete-orphan')
@@ -128,29 +130,22 @@ class CartItem(db.Model, SerializerMixin):
     cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
     artwork_id = db.Column(db.Integer, db.ForeignKey('artworks.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    price = db.Column(db.Integer, nullable=False)  
-    title = db.Column(db.String, nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    image = db.Column(db.String, nullable=True)
     
     
     def to_dict(self):
         return{
             'id': self.id,
             'cart_id': self.cart_id,
+            'cart': self.cart.to_dict(),
             'artwork_id': self.artwork_id,
             'quantity': self.quantity,
-            'price': self.price,
-            'title': self.title,
-            'description': self.description,
-            'image': self.image,
             'artwork': self.artwork.to_dict() if self.artwork else None  # Add artwork data if it exists, else return None
         }
 
     cart = db.relationship('Cart', back_populates='items')
     artwork = db.relationship('Artwork')
 
-    serialize_only = ('id', 'cart_id', 'artwork_id', 'quantity', 'price', 'title', 'description', 'image')
+    serialize_only = ('id', 'cart_id', 'artwork_id', 'quantity')
     serialize_rules = ('-cart.items', '-artwork')
 
 class Order(db.Model, SerializerMixin):

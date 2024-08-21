@@ -16,7 +16,6 @@ event_parser.add_argument('time', type=str, required=True, help='Time is require
 event_parser.add_argument('location', type=str, required=True, help='Location is required')
 
 class EventsResource(Resource):
-    @jwt_required()
     def get(self, id=None):
         try:
             current_user_id = get_jwt_identity()
