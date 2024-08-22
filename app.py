@@ -1109,10 +1109,12 @@ def send_message():
         return jsonify({"error": "Invalid data"}), 400
 
     try:
+        # Attempt to create and save the message
         new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
         db.session.add(new_message)
         db.session.commit()
 
+        # Emit the new message event to the socket
         socketio.emit('new_message', {
             'sender_id': sender_id,
             'recipient_id': recipient_id,
@@ -1129,7 +1131,11 @@ def send_message():
         }), 201
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Log the exact error to the server console for debugging
+        print(f"Error sending message: {str(e)}")
+        db.session.rollback()  # Rollback the session in case of an error
+        return jsonify({"error": "An error occurred while sending the message."}), 500
+
 
 
 
