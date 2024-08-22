@@ -1311,6 +1311,8 @@ class DashboardOverviewResource(Resource):
             'users_count': users_count,
             'recent_transactions': recent_transactions_data,
             'recent_activity': user_activity_data,
+            'event_data': event_data,
+            'booking_data': booking_data,
         }
 
         return jsonify(response)
@@ -1325,6 +1327,8 @@ from Resources.booking import BookingResource
 from Resources.admin_ticket import TicketAdminResource
 # from Resources.payment import PaymentSearchResource
 from Resources.payment import PaymentResource
+from Resources.payment import OrderDetailsResource
+from Resources.payment import BookingDetailsResource
 
     
 # api.add_resource(Signup, '/signup')
@@ -1343,6 +1347,8 @@ api.add_resource(RemoveFromCartResource, '/remove_from_cart/<int:item_id>')
 
 api.add_resource(MessageResource, '/messages')
 api.add_resource(PaymentResource, '/payments')
+api.add_resource(OrderDetailsResource, '/order-details/<order_id>')
+api.add_resource(BookingDetailsResource, '/booking-details/<booking_id>')
 # api.add_resource(PaymentSearchResource, '/payments/search')
 api.add_resource(ArtworkByOrderResource, '/artworks/order/<int:order_id>')
 
