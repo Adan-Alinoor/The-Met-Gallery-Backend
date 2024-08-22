@@ -1254,24 +1254,18 @@ def send_message():
     if not recipient_id or not message_text:
         return jsonify({"error": "Invalid data"}), 400
 
-    new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
+    new_message = Message(sender=sender_id, recipient=recipient_id, message=message_text)
     db.session.add(new_message)
     db.session.commit()
 
     socketio.emit('new_message', {
-        'sender_id': sender_id,
-        'recipient_id': recipient_id,
-        'content': message_text,
-        'sent_at': new_message.sent_at.isoformat()
-    })
+        'sender': sender_id,
+        'recipient': recipient_id,
+        'message': message_text,
+        'timestamp': new_message.timestamp.isoformat()
+    }, broadcast=True)
 
-    return jsonify({
-        'id': new_message.id,
-        'sender_id': sender_id,
-        'recipient_id': recipient_id,
-        'content': message_text,
-        'sent_at': new_message.sent_at.isoformat()
-    }), 201
+    return jsonify({"message": "Message sent"}), 201
 
 class MessageResource(Resource):
     @jwt_required()
