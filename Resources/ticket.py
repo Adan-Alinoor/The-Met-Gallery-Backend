@@ -113,7 +113,7 @@ class EventCheckoutResource(Resource):
                     "PartyA": phone_number,
                     "PartyB": SHORTCODE,
                     "PhoneNumber": phone_number,
-                    "CallBackURL": " https://8b73-102-214-72-2.ngrok-free.app/callback",
+                    "CallBackURL": " https://8b73-102-214-72-2.ngrok-free.app/eventcallback",
                     "AccountReference": f"Booking{booking_id}",
                     "TransactionDesc": "Payment for booking"
                 }

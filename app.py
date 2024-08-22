@@ -865,7 +865,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/artworkcallback",
+            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/callback",
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -1281,8 +1281,8 @@ api.add_resource(UserProfile, '/userprofile')
 api.add_resource(AdminResource, '/admin')
 api.add_resource(EventsResource, '/events', '/events/<int:id>', '/events/<int:user_id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
-api.add_resource(MpesaCallbackResource, '/callback')
-api.add_resource(MpesaCallbackResourceArtwork, '/artworkcallback')
+api.add_resource(MpesaCallbackResource, '/eventcallback')
+api.add_resource(MpesaCallbackResourceArtwork, '/callback')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(UpdateCartItemResource, '/update_cart_item/<int:item_id>')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart/<int:item_id>')
