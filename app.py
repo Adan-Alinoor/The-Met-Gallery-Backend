@@ -1142,7 +1142,7 @@ def send_message():
         return jsonify({"error": "A database error occurred while sending the message."}), 500
 
     except Exception as e:
-        print(f"Unexpected error occurred while
+        print(f"Unexpected error occurred while sending the message."), 500
 
 
 
