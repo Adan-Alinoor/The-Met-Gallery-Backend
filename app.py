@@ -842,7 +842,7 @@ class ArtworkCheckoutResource(Resource):
             order_id=order.id,
             amount=amount,
             phone_number=phone_number,
-            transaction_id=None, 
+            transaction_id=None,
             status='pending',
             created_at=datetime.now(),
             updated_at=datetime.now()
@@ -865,7 +865,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": " https://8b73-102-214-72-2.ngrok-free.app /callback",  
+            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/callback",
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -911,10 +911,12 @@ class ArtworkCheckoutResource(Resource):
             user_id = get_jwt_identity()
             if not user_id:
                 return {'error': 'User ID is required'}, 400
+            logging.debug(f'User ID: {user_id}')
 
             data = request.get_json()
             if not data:
                 return {'error': 'No input data provided'}, 400
+            logging.debug(f'Request data: {data}')
 
             phone_number = data.get('phone_number')
             if not phone_number:
@@ -940,13 +942,14 @@ class ArtworkCheckoutResource(Resource):
                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
                 if not cart_item or cart_item.quantity < quantity:
                     return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
-                
+
                 if cart_item.price is None:
                     return {'error': f'Price not set for artwork ID {artwork_id}'}, 400
-                
+
                 total_amount += cart_item.price * quantity
 
-            # Create the order with the total amount
+            logging.debug(f'Total amount calculated: {total_amount}')
+
             order = Order(user_id=user.id, total_price=total_amount)
             db.session.add(order)
             db.session.flush()  # Ensure the order.id is available
@@ -980,6 +983,7 @@ class ArtworkCheckoutResource(Resource):
                 'amount': total_amount
             }
 
+            logging.debug(f'Payment data: {payment_data}')
             payment_response, status_code = self.initiate_mpesa_payment(payment_data)
 
             if status_code != 201:
@@ -996,6 +1000,11 @@ class ArtworkCheckoutResource(Resource):
             db.session.rollback()
             logging.error(f'Database error: {e}')
             return {'error': 'An error occurred while processing the order'}, 500
+        except Exception as e:
+            logging.error(f'Unexpected error: {e}')
+            return {'error': 'An unexpected error occurred'}, 500
+
+
 
 
 
