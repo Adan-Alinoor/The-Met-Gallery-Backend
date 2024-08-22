@@ -238,11 +238,16 @@ class Message(db.Model, SerializerMixin):
     recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     content = db.Column(db.Text, nullable=False)
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
     sender_user = db.relationship('User', foreign_keys=[sender_id], back_populates='sent_messages')
     recipient_user = db.relationship('User', foreign_keys=[recipient_id], back_populates='received_messages')
-
+    
     serialize_only = ('id', 'sender_id', 'recipient_id', 'content', 'sent_at')
+
+    def __init__(self, sender_id, recipient_id, content):
+        self.sender_id = sender_id
+        self.recipient_id = recipient_id
+        self.content = content
 
 class UserActivity(db.Model, SerializerMixin):
     __tablename__ = 'user_activities'
