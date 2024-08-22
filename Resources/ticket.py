@@ -5,13 +5,13 @@ import os
 import threading
 import time
 from datetime import datetime
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required,get_jwt_identity
 import requests
 from dotenv import load_dotenv
 from flask import request, current_app, make_response, jsonify
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
-from models import db, Ticket, Booking, User, Payment
+from models import db, Ticket, Booking, User, Payment,BookingItem
 
 load_dotenv()
 
