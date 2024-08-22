@@ -729,7 +729,7 @@ def get_mpesa_access_token():
         raise Exception(f"Error getting access token: {response.text}")
     
     
-    
+    m
     
 
 def generate_password(shortcode, passkey):

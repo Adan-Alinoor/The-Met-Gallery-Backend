@@ -90,81 +90,87 @@ class TicketResource(Resource):
 
 class EventCheckoutResource(Resource):
     def initiate_mpesa_payment(self, payment_data):
-        user_id = payment_data.get('user_id')
-        booking_id = payment_data.get('booking_id')
-        phone_number = payment_data.get('phone_number')
-        amount = payment_data.get('amount')
+        with current_app.app_context():
+            user_id = payment_data.get('user_id')
+            booking_id = payment_data.get('booking_id')
+            phone_number = payment_data.get('phone_number')
+            amount = payment_data.get('amount')
 
-        try:
-            # Retrieve access token
-            access_token = get_mpesa_access_token()
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Content-Type': 'application/json'
-            }
-            password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
-            payload = {
-                "BusinessShortCode": SHORTCODE,
-                "Password": password,
-                "Timestamp": timestamp,
-                "TransactionType": "CustomerPayBillOnline",
-                "Amount": amount,
-                "PartyA": phone_number,
-                "PartyB": SHORTCODE,
-                "PhoneNumber": phone_number,
-                "CallBackURL": "  https://1a61-102-214-72-2.ngrok-free.app /callback",
-                "AccountReference": f"Booking{booking_id}",
-                "TransactionDesc": "Payment for booking"
-            }
+            try:
+                # Retrieve access token
+                access_token = get_mpesa_access_token()
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json'
+                }
+                password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
+                payload = {
+                    "BusinessShortCode": SHORTCODE,
+                    "Password": password,
+                    "Timestamp": timestamp,
+                    "TransactionType": "CustomerPayBillOnline",
+                    "Amount": amount,
+                    "PartyA": phone_number,
+                    "PartyB": SHORTCODE,
+                    "PhoneNumber": phone_number,
+                    "CallBackURL": "https://1a61-102-214-72-2.ngrok-free.app/callback",
+                    "AccountReference": f"Booking{booking_id}",
+                    "TransactionDesc": "Payment for booking"
+                }
 
-            # Send payment request
-            response = requests.post(
-                "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-                headers=headers,
-                json=payload
-            )
-            response.raise_for_status()  # Raise HTTPError for bad responses
+                # Log the payload for debugging
+                logging.debug(f'Sending M-Pesa API request with payload: {payload}')
 
-            response_data = response.json()
-            logging.debug(f'M-Pesa API Response: {response_data}')
+                # Send payment request
+                response = requests.post(
+                    "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+                    headers=headers,
+                    json=payload
+                )
+                response.raise_for_status()  # Raise HTTPError for bad responses
 
-            # Check M-Pesa response
-            if response_data.get('ResponseCode') == '0':
-                # Payment initiated successfully
-                payment = Payment.query.filter_by(booking_id=booking_id).first()
-                if payment:
-                    payment.transaction_id = response_data['CheckoutRequestID']
-                    payment.status = 'initiated'
-                    db.session.commit()
-                    return {'message': 'Payment initiated successfully'}, 201
+                response_data = response.json()
+                logging.debug(f'M-Pesa API Response: {response_data}')
+
+                # Check M-Pesa response
+                if response_data.get('ResponseCode') == '0':
+                    # Payment initiated successfully
+                    payment = Payment.query.filter_by(booking_id=booking_id).first()
+                    if payment:
+                        payment.transaction_id = response_data['CheckoutRequestID']
+                        payment.status = 'initiated'
+                        db.session.commit()
+                        return {'message': 'Payment initiated successfully'}, 201
+                    else:
+                        logging.error(f'Payment record not found for booking_id: {booking_id}')
+                        return {'error': 'Payment record not found'}, 404
                 else:
-                    logging.error(f'Payment record not found for booking_id: {booking_id}')
-                    return {'error': 'Payment record not found'}, 404
-            else:
-                # Handle error response from M-Pesa
+                    # Handle error response from M-Pesa
+                    logging.error(f'Failed M-Pesa transaction: {response_data}')
+                    payment = Payment.query.filter_by(booking_id=booking_id).first()
+                    if payment:
+                        payment.status = 'failed'
+                        payment.result_desc = response_data.get('ResponseDescription', 'Failed to initiate payment')
+                        db.session.commit()
+                    return {'error': 'Failed to initiate payment'}, 400
+
+            except requests.exceptions.RequestException as e:
+                logging.error(f'Error calling M-Pesa API: {e}')
                 payment = Payment.query.filter_by(booking_id=booking_id).first()
                 if payment:
                     payment.status = 'failed'
-                    payment.result_desc = response_data.get('ResponseDescription', 'Failed to initiate payment')
+                    payment.result_desc = 'Failed to connect to M-Pesa API'
                     db.session.commit()
-                return {'error': 'Failed to initiate payment'}, 400
+                return {'error': 'Failed to connect to M-Pesa API'}, 500
+            except ValueError as e:
+                logging.error(f'Invalid JSON response from M-Pesa API: {e}')
+                payment = Payment.query.filter_by(booking_id=booking_id).first()
+                if payment:
+                    payment.status = 'failed'
+                    payment.result_desc = 'Invalid response from M-Pesa API'
+                    db.session.commit()
+                return {'error': 'Invalid response from M-Pesa API'}, 500
 
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error calling M-Pesa API: {e}')
-            payment = Payment.query.filter_by(booking_id=booking_id).first()
-            if payment:
-                payment.status = 'failed'
-                payment.result_desc = 'Failed to connect to M-Pesa API'
-                db.session.commit()
-            return {'error': 'Failed to connect to M-Pesa API'}, 500
-        except ValueError:
-            logging.error('Invalid JSON response from M-Pesa API')
-            payment = Payment.query.filter_by(booking_id=booking_id).first()
-            if payment:
-                payment.status = 'failed'
-                payment.result_desc = 'Invalid response from M-Pesa API'
-                db.session.commit()
-            return {'error': 'Invalid response from M-Pesa API'}, 500
 
     def post(self):
         """
