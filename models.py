@@ -244,10 +244,10 @@ class Message(db.Model, SerializerMixin):
     
     serialize_only = ('id', 'sender_id', 'recipient_id', 'content', 'sent_at')
 
-    # def __init__(self, sender_id, recipient_id, content):
-    #     self.sender_id = sender_id
-    #     self.recipient_id = recipient_id
-    #     self.content = content
+    def __init__(self, sender_id, recipient_id, content):
+        self.sender_id = sender_id
+        self.recipient_id = recipient_id
+        self.content = content
 
 class UserActivity(db.Model, SerializerMixin):
     __tablename__ = 'user_activities'

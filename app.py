@@ -1106,16 +1106,17 @@ def send_message():
     sender_id = get_jwt_identity()
 
     if not recipient_id or not message_text:
-        return jsonify({"error": "Invalid data"}), 400
+        return jsonify({"error": "Invalid data. Both recipient_id and message are required."}), 400
 
     try:
-        # Attempt to create and save the message
+        # Create and save the message
         new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
         db.session.add(new_message)
         db.session.commit()
 
         # Emit the new message event to the socket
         socketio.emit('new_message', {
+            'id': new_message.id,
             'sender_id': sender_id,
             'recipient_id': recipient_id,
             'content': message_text,
@@ -1130,11 +1131,15 @@ def send_message():
             'sent_at': new_message.sent_at.isoformat()
         }), 201
 
-    except Exception as e:
-        # Log the exact error to the server console for debugging
-        print(f"Error sending message: {str(e)}")
+    except SQLAlchemyError as e:
         db.session.rollback()  # Rollback the session in case of an error
-        return jsonify({"error": "An error occurred while sending the message."}), 500
+        print(f"SQLAlchemyError occurred while sending message: {str(e)}")
+        return jsonify({"error": "A database error occurred while sending the message."}), 500
+
+    except Exception as e:
+        print(f"Unexpected error occurred while sending message: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred while sending the message."}), 500
+
 
 
 
