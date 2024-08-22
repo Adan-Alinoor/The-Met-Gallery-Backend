@@ -89,8 +89,8 @@ class TicketResource(Resource):
 
 
 class EventCheckoutResource(Resource):
-    def initiate_mpesa_payment(self, payment_data):
-        with current_app.app_context():
+    def initiate_mpesa_payment(self, app, payment_data):
+        with app.app_context():
             user_id = payment_data.get('user_id')
             booking_id = payment_data.get('booking_id')
             phone_number = payment_data.get('phone_number')
@@ -113,7 +113,7 @@ class EventCheckoutResource(Resource):
                     "PartyA": phone_number,
                     "PartyB": SHORTCODE,
                     "PhoneNumber": phone_number,
-                    "CallBackURL": "https://1a61-102-214-72-2.ngrok-free.app/callback",
+                    "CallBackURL": " https://8b73-102-214-72-2.ngrok-free.app/callback",
                     "AccountReference": f"Booking{booking_id}",
                     "TransactionDesc": "Payment for booking"
                 }
@@ -171,11 +171,7 @@ class EventCheckoutResource(Resource):
                     db.session.commit()
                 return {'error': 'Invalid response from M-Pesa API'}, 500
 
-
     def post(self):
-        """
-        Handles ticket purchase and payment initiation via M-Pesa.
-        """
         args = ticket_parser.parse_args()
         user_id = args['user_id']
         ticket_type = args['ticket_type']
@@ -227,8 +223,9 @@ class EventCheckoutResource(Resource):
             db.session.add(payment)
             db.session.commit()
 
+            # Pass the current app context to the thread
             app = current_app._get_current_object()
-            thread = threading.Thread(target=self.initiate_mpesa_payment, args=(payment_data,))
+            thread = threading.Thread(target=self.initiate_mpesa_payment, args=(app, payment_data,))
             thread.start()
 
             return {

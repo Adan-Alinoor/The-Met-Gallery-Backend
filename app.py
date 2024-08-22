@@ -865,7 +865,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://fcbf-102-214-74-3.ngrok-free.app",  
+            "CallBackURL": " https://8b73-102-214-72-2.ngrok-free.app /callback",  
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
