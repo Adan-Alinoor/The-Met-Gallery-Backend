@@ -1103,7 +1103,12 @@ def send_message():
     data = request.json
     recipient_id = data.get('recipient_id')
     message_text = data.get('message')
-    sender_id = get_jwt_identity()
+
+    # Extract sender_id from the session (using get_jwt_identity or another session management method)
+    sender_id = get_jwt_identity()  # This assumes you are using JWT and `sender_id` is stored in the token
+
+    if not sender_id:
+        return jsonify({"error": "Sender ID not found in session."}), 400
 
     if not recipient_id or not message_text:
         return jsonify({"error": "Invalid data. Both recipient_id and message are required."}), 400
@@ -1137,8 +1142,8 @@ def send_message():
         return jsonify({"error": "A database error occurred while sending the message."}), 500
 
     except Exception as e:
-        print(f"Unexpected error occurred while sending message: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred while sending the message."}), 500
+        print(f"Unexpected error occurred while
+
 
 
 
