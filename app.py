@@ -1278,6 +1278,7 @@ def send_message():
         return jsonify({"error": str(e)}), 500
 
 
+
 class MessageResource(Resource):
     @jwt_required()
     def get(self):
