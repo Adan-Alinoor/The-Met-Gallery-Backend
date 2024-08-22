@@ -361,6 +361,41 @@ class AdminResource(Resource):
     def get(self):
         return {'message': 'Admin content accessible'}
 
+# class ArtworkListResource(Resource):
+
+#     def get(self):
+#         try:
+#             artworks = Artwork.query.all()
+#             return [artwork.to_dict() for artwork in artworks], 200
+#         except Exception as e:
+#             return {"error": str(e)}, 500
+        
+#     @jwt_required()
+#     def post(self, user_id):
+#         data = request.get_json()
+#         print("Received data:", data)
+#         if not data:
+#             return {"error": "No input data provided"}, 400
+#         if not all(k in data for k in ("title", "description", "price", "image")):
+#             return {"error": "Missing fields in input data"}, 400
+
+#         try:
+#             new_artwork = Artwork(
+#                 title=data['title'],
+#                 description=data['description'],
+#                 price=data['price'],
+#                 image=data['image'],
+#                 user_id=user_id  # Linking the artwork to the user
+#             )
+#             db.session.add(new_artwork)
+#             db.session.commit()
+#             return {"message": "Artwork created", "artwork": new_artwork.to_dict()}, 201
+#         except Exception as e:
+#             print("Error creating artwork:", str(e))
+#             return {"error": str(e)}, 500
+
+
+
 class ArtworkListResource(Resource):
 
     def get(self):
@@ -371,7 +406,8 @@ class ArtworkListResource(Resource):
             return {"error": str(e)}, 500
         
     @jwt_required()
-    def post(self, user_id):
+    def post(self):
+        user_id = get_jwt_identity()  # Retrieve user_id from the JWT token
         data = request.get_json()
         print("Received data:", data)
         if not data:
@@ -393,6 +429,7 @@ class ArtworkListResource(Resource):
         except Exception as e:
             print("Error creating artwork:", str(e))
             return {"error": str(e)}, 500
+
 
 class ArtworkResource(Resource):
    
