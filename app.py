@@ -707,7 +707,7 @@ CONSUMER_KEY = os.getenv('CONSUMER_KEY')
 CONSUMER_SECRET = os.getenv('CONSUMER_SECRET')
 SHORTCODE = os.getenv('SHORTCODE')
 LIPA_NA_MPESA_ONLINE_PASSKEY = os.getenv('LIPA_NA_MPESA_ONLINE_PASSKEY')
-PHONE_NUMBER = os.getenv('PHONE_NUMBER')
+
 
 def get_mpesa_access_token():
     api_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
@@ -781,7 +781,7 @@ def create_payment(payment_data):
         "PartyA": payment_data['phone_number'],
         "PartyB": SHORTCODE,
         "PhoneNumber": payment_data['phone_number'],
-        "CallBackURL": "  https://1a61-102-214-72-2.ngrok-free.app /callback",  
+        "CallBackURL": "  https://8b73-102-214-72-2.ngrok-free.app /callback",  
         "AccountReference": f"Order{payment_data.get('order_id')}",
         "TransactionDesc": "Payment for order"
     }
