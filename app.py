@@ -865,7 +865,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/callback",
+            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/artworkcallback",
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
@@ -1005,240 +1005,94 @@ class ArtworkCheckoutResource(Resource):
             return {'error': 'An unexpected error occurred'}, 500
 
 
+# @app.route('/callback', methods=['POST'])
+# def mpesa_callback():
+#     data = request.get_json()
 
+#     checkout_request_id = data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+#     result_code = data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
+#     result_desc = data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
 
+#     if not data:
+#         logging.error("No data received in callback")
+#         return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
+    
+#     secret_key = request.headers.get('X-Callback-Secret')
+#     if secret_key != CALLBACK_SECRET:
+#         logging.error("Invalid callback secret")
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
 
-# class ArtworkCheckoutResource(Resource):
-#     @staticmethod
-#     def initiate_mpesa_payment(payment_data):
-#         if not isinstance(payment_data, dict):
-#             logging.error(f'Expected a dictionary but got: {type(payment_data)}')
-#             return {'error': 'Invalid payment data format'}, 400
+#     try:
+#         stk_callback = data['Body']['stkCallback']
+#         checkout_request_id = stk_callback['CheckoutRequestID']
+#         result_code = stk_callback['ResultCode']
+#         result_desc = stk_callback['ResultDesc']
+#     except KeyError as e:
+#         logging.error(f'Missing key in callback data: {e}')
+#         return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
 
-#         logging.debug(f'Payment data: {payment_data}')
+#     # Log the extracted callback data
+#     logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+#     logging.debug(f'ResultCode: {result_code}')
+#     logging.debug(f'ResultDesc: {result_desc}')
 
-#         user_id = payment_data.get('user_id')
-#         order_id = payment_data.get('order_id')
-#         phone_number = payment_data.get('phone_number')
-#         amount = payment_data.get('amount')
+#     payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
 
-#         if not all([user_id, order_id, phone_number, amount]):
-#             logging.error('Missing required fields in payment data')
-#             return {'error': 'Missing required fields'}, 400
+#     if payment:
+#         if result_code == 0:
+#             payment.status = 'complete'
+#             payment.transaction_desc = result_desc
+#         else:
+#             payment.status = 'failed'
+#             payment.transaction_desc = result_desc
 
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {'error': 'User not found'}, 404
-
-#         order = Order.query.get(order_id)
-#         if not order:
-#             return {'error': 'Order not found'}, 404
-
-#         payment = Payment(
-#             user_id=user.id,
-#             order_id=order.id,
-#             amount=amount,
-#             phone_number=phone_number,
-#             transaction_id=None, 
-#             status='pending',
-#             created_at=datetime.now(),
-#             updated_at=datetime.now()
-#         )
-#         db.session.add(payment)
 #         db.session.commit()
 
-#         access_token = get_mpesa_access_token()
-#         headers = {
-#             'Authorization': f'Bearer {access_token}',
-#             'Content-Type': 'application/json'
-#         }
-#         password, timestamp = generate_password(SHORTCODE, LIPA_NA_MPESA_ONLINE_PASSKEY)
-#         payload = {
-#             "BusinessShortCode": SHORTCODE,
-#             "Password": password,
-#             "Timestamp": timestamp,
-#             "TransactionType": "CustomerPayBillOnline",
-#             "Amount": amount,
-#             "PartyA": phone_number,
-#             "PartyB": SHORTCODE,
-#             "PhoneNumber": phone_number,
-#             "CallBackURL": "https://e9b4-102-214-72-2.ngrok-free.app/callback ",  
-#             "AccountReference": f"Order{order.id}",
-#             "TransactionDesc": "Payment for order"
-#         }
 
-#         try:
-#             response = requests.post(
-#                 "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
-#                 headers=headers,
-#                 json=payload
-#             )
+#     return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
-#             logging.debug(f'M-Pesa API Response: {response.text}')
-#             response_data = response.json()
+class MpesaCallbackResourceArtwork(Resource):
+    CALLBACK_SECRET = 'your_secret_key_here'  # Replace with your actual secret
 
-#             if response_data.get('ResponseCode') == '0':
-#                 payment.transaction_id = response_data.get('CheckoutRequestID')
-#                 payment.status = 'initiated'
-#                 payment.transaction_desc = "Payment initiated successfully"
-#                 db.session.commit()
-#                 return {'message': 'Payment initiated successfully', 'transaction_desc': payment.transaction_desc}, 201
-#             else:
-#                 payment.status = 'failed'
-#                 payment.transaction_desc = response_data.get('Description', 'Payment failed')
-#                 db.session.commit()
-#                 return {'error': 'Failed to initiate payment'}, 400
+    def post(self):
+        data = request.get_json()
 
-#         except requests.exceptions.RequestException as e:
-#             logging.error(f'Error calling M-Pesa API: {e}')
-#             payment.status = 'failed'
-#             payment.transaction_desc = 'Failed to connect to M-Pesa API'
-#             db.session.commit()
-#             return {'error': 'Failed to connect to M-Pesa API'}, 500
-#         except ValueError:
-#             logging.error(f'Invalid JSON response: {response.text}')
-#             payment.status = 'failed'
-#             payment.transaction_desc = 'Invalid response from M-Pesa API'
-#             db.session.commit()
-#             return {'error': 'Invalid response from M-Pesa API'}, 500
+        if not data:
+            logging.error("No data received in callback")
+            return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
 
-#     @jwt_required()
-#     def post(self):
-#         try:
-#             user_id = get_jwt_identity()
-#             if not user_id:
-#                 return {'error': 'User ID is required'}, 400
+        secret_key = request.headers.get('X-Callback-Secret')
+        if secret_key != self.CALLBACK_SECRET:
+            logging.error("Invalid callback secret")
+            return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
 
-#             data = request.get_json()
-#             if not data:
-#                 return {'error': 'No input data provided'}, 400
+        try:
+            stk_callback = data['Body']['stkCallback']
+            checkout_request_id = stk_callback['CheckoutRequestID']
+            result_code = stk_callback['ResultCode']
+            result_desc = stk_callback['ResultDesc']
+        except KeyError as e:
+            logging.error(f'Missing key in callback data: {e}')
+            return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
 
-#             phone_number = data.get('phone_number')
-#             if not phone_number:
-#                 return {'error': 'Phone number is required'}, 400
+        # Log the extracted callback data
+        logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+        logging.debug(f'ResultCode: {result_code}')
+        logging.debug(f'ResultDesc: {result_desc}')
 
-#             selected_items = data.get('items', [])
-#             if not selected_items:
-#                 return {'error': 'No items selected for checkout'}, 400
+        payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
 
-#             user = User.query.get(user_id)
-#             if not user:
-#                 return {'error': 'User not found'}, 404
+        if payment:
+            if result_code == 0:
+                payment.status = 'complete'
+                payment.transaction_desc = result_desc
+            else:
+                payment.status = 'failed'
+                payment.transaction_desc = result_desc
 
-#             cart = Cart.query.filter_by(user_id=user.id).first()
-#             if not cart or not cart.items:
-#                 return {'error': 'Cart is empty'}, 400
+            db.session.commit()
 
-#             total_amount = 0
-#             for selected_item in selected_items:
-#                 artwork_id = selected_item.get('artwork_id')
-#                 quantity = selected_item.get('quantity', 1)
-
-#                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-#                 if not cart_item or cart_item.quantity < quantity:
-#                     return {'error': f'Invalid quantity for artwork ID {artwork_id}'}, 400
-
-#                 total_amount += cart_item.price * quantity
-
-#             # Create the order with the total amount
-#             order = Order(user_id=user.id, total_price=total_amount)
-#             db.session.add(order)
-#             db.session.flush()  # Ensure the order.id is available
-
-#             for selected_item in selected_items:
-#                 artwork_id = selected_item.get('artwork_id')
-#                 quantity = selected_item.get('quantity', 1)
-
-#                 cart_item = CartItem.query.filter_by(cart_id=cart.id, artwork_id=artwork_id).first()
-
-#                 order_item = OrderItem(
-#                     order_id=order.id,
-#                     artwork_id=artwork_id,
-#                     quantity=quantity,
-#                     price=cart_item.price,
-#                     title=cart_item.title,  # Ensure title is passed here
-#                     description=cart_item.description,  # Include other fields if necessary
-#                     image=cart_item.image  # Include other fields if necessary
-#                 )
-#                 db.session.add(order_item)
-
-#                 if cart_item.quantity > quantity:
-#                     cart_item.quantity -= quantity
-#                 else:
-#                     db.session.delete(cart_item)
-
-#             db.session.commit()
-
-#             payment_data = {
-#                 'user_id': user.id,
-#                 'order_id': order.id,
-#                 'phone_number': phone_number,
-#                 'amount': total_amount
-#             }
-
-#             payment_response, status_code = self.initiate_mpesa_payment(payment_data)
-
-#             if status_code != 201:
-#                 db.session.rollback()
-#                 return payment_response, 400
-
-#             return {
-#                 'message': 'Order created and payment initiated successfully',
-#                 'order_id': order.id,
-#                 'transaction_desc': payment_response.get('transaction_desc')
-#             }, 201
-
-#         except SQLAlchemyError as e:
-#             db.session.rollback()
-#             logging.error(f'Database error: {e}')
-#             return {'error': 'An error occurred while processing the order'}, 500
-
-
-@app.route('/callback', methods=['POST'])
-def mpesa_callback():
-    data = request.get_json()
-
-    checkout_request_id = data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-    result_code = data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
-    result_desc = data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
-
-    if not data:
-        logging.error("No data received in callback")
-        return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
-    
-    secret_key = request.headers.get('X-Callback-Secret')
-    if secret_key != CALLBACK_SECRET:
-        logging.error("Invalid callback secret")
-        return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
-
-    try:
-        stk_callback = data['Body']['stkCallback']
-        checkout_request_id = stk_callback['CheckoutRequestID']
-        result_code = stk_callback['ResultCode']
-        result_desc = stk_callback['ResultDesc']
-    except KeyError as e:
-        logging.error(f'Missing key in callback data: {e}')
-        return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
-
-    # Log the extracted callback data
-    logging.debug(f'CheckoutRequestID: {checkout_request_id}')
-    logging.debug(f'ResultCode: {result_code}')
-    logging.debug(f'ResultDesc: {result_desc}')
-
-    payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
-
-    if payment:
-        if result_code == 0:
-            payment.status = 'complete'
-            payment.transaction_desc = result_desc
-        else:
-            payment.status = 'failed'
-            payment.transaction_desc = result_desc
-
-        db.session.commit()
-
-
-    return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
 
         
@@ -1428,6 +1282,7 @@ api.add_resource(AdminResource, '/admin')
 api.add_resource(EventsResource, '/events', '/events/<int:id>', '/events/<int:user_id>')
 api.add_resource(TicketResource, '/tickets', '/tickets/<int:id>')
 api.add_resource(MpesaCallbackResource, '/callback')
+api.add_resource(MpesaCallbackResourceArtwork, '/artworkcallback')
 api.add_resource(AddToCartResource, '/add_to_cart')
 api.add_resource(UpdateCartItemResource, '/update_cart_item/<int:item_id>')
 api.add_resource(RemoveFromCartResource, '/remove_from_cart/<int:item_id>')
