@@ -835,7 +835,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://8b73-102-214-72-2.ngrok-free.app/callback",
+            "CallBackURL": "https://the-met-gallery-backend.onrender.com/callback",
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
