@@ -327,7 +327,6 @@ class UserResource(Resource):
             return {'message': 'User not found'}, 404
 
         args = request.get_json()
-
         if User.query.filter_by(username=args.get('username')).first() and args.get('username') != user.username:
             return {'message': 'Username is already taken'}, 400
 
@@ -345,13 +344,21 @@ class UserResource(Resource):
         return {'message': 'User updated successfully'}, 200
 
     @jwt_required()
-    def delete(self):
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        if not user:
+    def delete(self, user_id):
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+        user_to_delete = User.query.get(user_id)
+
+        if not current_user or not user_to_delete:
             return {'message': 'User not found'}, 404
 
-        db.session.delete(user)
+        if not current_user.is_admin:
+            return {'message': 'Unauthorized access'}, 403  # Return 403 Forbidden for non-admin users
+
+        if current_user_id == user_id:
+            return {'message': 'Cannot delete yourself'}, 400  # Prevent deleting the current user
+
+        db.session.delete(user_to_delete)
         db.session.commit()
         return {'message': 'User deleted successfully'}, 200
 
@@ -395,7 +402,6 @@ class AdminResource(Resource):
 #             return {"error": str(e)}, 500
 
 
-
 class ArtworkListResource(Resource):
 
     def get(self):
@@ -430,25 +436,32 @@ class ArtworkListResource(Resource):
             print("Error creating artwork:", str(e))
             return {"error": str(e)}, 500
 
-
 class ArtworkResource(Resource):
-   
+
     def get(self, id):
         try:
             artwork = Artwork.query.get(id)
+            if artwork is None:
+                return {"error": "Artwork not found"}, 404
             return artwork.to_dict(), 200
-                                     
         except Exception as e:
             return {"error": str(e)}, 500
     
-    @user_required  
+    @jwt_required()
     def put(self, id):
+        user_id = get_jwt_identity()
         data = request.get_json()
         if not data:
             return {"error": "No input data provided"}, 400
 
         try:
             artwork = Artwork.query.get_or_404(id)
+            user = User.query.get_or_404(user_id)
+
+            # Check if the user is an admin or the owner of the artwork
+            if not user.is_admin and artwork.user_id != user_id:
+                return {"error": "Unauthorized access"}, 403
+
             artwork.title = data.get('title', artwork.title)
             artwork.description = data.get('description', artwork.description)
             artwork.price = data.get('price', artwork.price)
@@ -458,16 +471,23 @@ class ArtworkResource(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-    @user_required  
+    @jwt_required()
     def delete(self, id):
+        user_id = get_jwt_identity()
         try:
             artwork = Artwork.query.get_or_404(id)
+            user = User.query.get_or_404(user_id)
+
+            # Check if the user is an admin or the owner of the artwork
+            if not user.is_admin and artwork.user_id != user_id:
+                return {"error": "Unauthorized access"}, 403
+
             db.session.delete(artwork)
             db.session.commit()
             return {"message": "Artwork deleted"}, 200
         except Exception as e:
             return {"error": str(e)}, 500
-        
+
 class ArtworkByOrderResource(Resource):
     @user_required  
     def get(self, order_id):
@@ -1334,7 +1354,7 @@ from Resources.payment import BookingDetailsResource
 # api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
 api.add_resource(Logout, '/logout')
-api.add_resource(UserResource, '/user')
+api.add_resource(UserResource, '/user', '/user/<int:id>')
 api.add_resource(UserProfile, '/userprofile')
 api.add_resource(AdminResource, '/admin')
 api.add_resource(EventsResource, '/events', '/events/<int:id>', '/events/<int:user_id>')
