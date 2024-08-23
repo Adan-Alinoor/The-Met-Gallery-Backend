@@ -116,7 +116,7 @@ class EventCheckoutResource(Resource):
                     "PartyA": phone_number,
                     "PartyB": SHORTCODE,
                     "PhoneNumber": phone_number,
-                    "CallBackURL": "https://4a91-102-214-72-2.ngrok-free.app/eventcallback",
+                    "CallBackURL": "https://the-met-gallery-backend.onrender.com/eventcallback",
                     "AccountReference": f"Booking{booking_id}",
                     "TransactionDesc": "Payment for booking"
                 }
