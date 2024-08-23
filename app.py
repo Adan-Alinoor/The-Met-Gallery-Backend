@@ -302,7 +302,6 @@ class UsersResource(Resource):
             'created_at': user.created_at
         } for user in users])
 
-
 class UserResource(Resource):
     @jwt_required()
     def get(self):
@@ -344,24 +343,29 @@ class UserResource(Resource):
         return {'message': 'User updated successfully'}, 200
 
     @jwt_required()
-    def delete(self, user_id):
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
-        user_to_delete = User.query.get(user_id)
+    def delete(self):
+        try:
+            current_user_id = get_jwt_identity()
+            current_user = User.query.get(current_user_id)
+            user_to_delete_id = request.view_args.get('id')
+            user_to_delete = User.query.get(user_to_delete_id)
 
-        if not current_user or not user_to_delete:
-            return {'message': 'User not found'}, 404
+            if not current_user or not user_to_delete:
+                return {'message': 'User not found'}, 404
 
-        if not current_user.is_admin:
-            return {'message': 'Unauthorized access'}, 403  # Return 403 Forbidden for non-admin users
+            if not current_user.is_admin:
+                return {'message': 'Unauthorized access'}, 403
 
-        if current_user_id == user_id:
-            return {'message': 'Cannot delete yourself'}, 400  # Prevent deleting the current user
+            if current_user_id == user_to_delete_id:
+                return {'message': 'Cannot delete yourself'}, 400
 
-        db.session.delete(user_to_delete)
-        db.session.commit()
-        return {'message': 'User deleted successfully'}, 200
+            db.session.delete(user_to_delete)
+            db.session.commit()
+            return {'message': 'User deleted successfully'}, 200
 
+        except Exception as e:
+            db.session.rollback()
+            return {'message': str(e)}, 500
 class AdminResource(Resource):
     @jwt_required()
     @admin_required
@@ -1227,7 +1231,7 @@ api.add_resource(ArtworkListResource, '/artworks')
 api.add_resource(ArtworkResource, '/artworks/<int:id>')
 api.add_resource(DashboardOverviewResource, '/dashboard')
 api.add_resource(Home, '/')
-api.add_resource(UsersResource, '/users')
+api.add_resource(UsersResource, '/users',)
 api.add_resource(Signup, '/signup')
 # api.add_resource(Login, '/login')
 api.add_resource(VerifyToken, '/verify-token')
