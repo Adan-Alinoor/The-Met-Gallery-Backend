@@ -1,7 +1,7 @@
 from flask_restful import Resource, reqparse
 from flask import jsonify, request, make_response
 from datetime import datetime
-from flask_jwt_extended import jwt_required, get_jwt_identity,verify_jwt_in_request
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 import logging
 
 from models import db, Event, Ticket, User, UserActivity
@@ -23,7 +23,7 @@ class EventsResource(Resource):
             user_specific = request.args.get('user_specific', 'false').lower() == 'true'
 
             if id:
-                # Fetch a specific event by ID for the current user
+                # Fetch a specific event by ID
                 event = Event.query.filter_by(id=id).first()
                 if event is None:
                     return {"error": "Event not found"}, 404
@@ -67,26 +67,34 @@ class EventsResource(Resource):
     @jwt_required()
     def put(self, id):
         current_user_id = get_jwt_identity()
-        event = Event.query.get_or_404(id)
-        if event.user_id != current_user_id:
-            return {"error": "Unauthorized access"}, 403
-
-        args = event_parser.parse_args()
-
         try:
-            event.start_date = datetime.strptime(args['start_date'], '%Y-%m-%d').date()
-            event.end_date = datetime.strptime(args['end_date'], '%Y-%m-%d').date()
-            event.time = datetime.strptime(args['time'], '%H:%M').time()
-        except ValueError as e:
-            return {"error": str(e)}, 400
+            event = Event.query.get_or_404(id)
+            user = User.query.get_or_404(current_user_id)
 
-        event.title = args['title']
-        event.image_url = args['image_url']
-        event.description = args['description']
-        event.location = args['location']
+            # Check if the current user is an admin or the owner of the event
+            if not user.is_admin and event.user_id != current_user_id:
+                return {"error": "You do not have permission to update this event."}, 403
 
-        db.session.commit()
-        return make_response(jsonify({'message': 'Event updated'}), 200)
+
+            args = event_parser.parse_args()
+
+            try:
+                event.start_date = datetime.strptime(args['start_date'], '%Y-%m-%d').date()
+                event.end_date = datetime.strptime(args['end_date'], '%Y-%m-%d').date()
+                event.time = datetime.strptime(args['time'], '%H:%M').time()
+            except ValueError as e:
+                return {"error": str(e)}, 400
+
+            event.title = args['title']
+            event.image_url = args['image_url']
+            event.description = args['description']
+            event.location = args['location']
+
+            db.session.commit()
+            return make_response(jsonify({'message': 'Event updated'}), 200)
+        except Exception as e:
+            logging.error(f"Error updating event: {e}")
+            return {"error": f"Error updating event: {str(e)}"}, 500
 
     @jwt_required()
     def post(self):
