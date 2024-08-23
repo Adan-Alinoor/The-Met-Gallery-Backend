@@ -243,37 +243,6 @@ class EventCheckoutResource(Resource):
 
 
 
-# class MpesaCallbackResource(Resource):
-#     def post(self):
-#         callback_data = request.get_json()
-
-#         logging.debug(f'M-Pesa Callback Data: {callback_data}')
-
-#         if not callback_data:
-#             return {'error': 'No data received from M-Pesa'}, 400
-
-#         payment_response_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
-#         payment_response_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
-
-#         transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-#         payment = Payment.query.filter_by(transaction_id=transaction_id).first()
-
-#         if payment_response_code == 0:
-#             if payment:
-#                 payment.status = 'completed'
-#                 payment.result_desc = payment_response_desc
-#                 db.session.commit()
-#                 return {'message': 'Payment completed successfully'}, 200
-#             else:
-#                 logging.error(f'Payment record not found for transaction_id: {transaction_id}')
-#                 return {'error': 'Payment record not found'}, 404
-#         else:
-#             if payment:
-#                 payment.status = 'failed'
-#                 payment.result_desc = payment_response_desc
-#                 db.session.commit()
-#             return {'error': 'Payment failed', 'description': payment_response_desc}, 400
-
 class MpesaCallbackResource(Resource):
     def post(self):
         callback_data = request.get_json()
@@ -286,9 +255,10 @@ class MpesaCallbackResource(Resource):
         payment_response_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
         payment_response_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
 
-        if payment_response_code == 0:  # Success case
-            transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-            payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+        transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+        payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+
+        if payment_response_code == 0:
             if payment:
                 payment.status = 'completed'
                 payment.result_desc = payment_response_desc
@@ -297,14 +267,44 @@ class MpesaCallbackResource(Resource):
             else:
                 logging.error(f'Payment record not found for transaction_id: {transaction_id}')
                 return {'error': 'Payment record not found'}, 404
-        else:  # Failure case
-            transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-            payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+        else:
             if payment:
                 payment.status = 'failed'
                 payment.result_desc = payment_response_desc
                 db.session.commit()
-            return {'error': 'Payment failed'}, 400
+            return {'error': 'Payment failed', 'description': payment_response_desc}, 400
+
+# class MpesaCallbackResource(Resource):
+#     def post(self):
+#         callback_data = request.get_json()
+
+#         logging.debug(f'M-Pesa Callback Data: {callback_data}')
+
+#         if not callback_data:
+#             return {'error': 'No data received from M-Pesa'}, 400
+
+#         payment_response_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
+#         payment_response_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
+
+#         if payment_response_code == 0:  # Success case
+#             transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+#             payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+#             if payment:
+#                 payment.status = 'completed'
+#                 payment.result_desc = payment_response_desc
+#                 db.session.commit()
+#                 return {'message': 'Payment completed successfully'}, 200
+#             else:
+#                 logging.error(f'Payment record not found for transaction_id: {transaction_id}')
+#                 return {'error': 'Payment record not found'}, 404
+#         else:  # Failure case
+#             transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+#             payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+#             if payment:
+#                 payment.status = 'failed'
+#                 payment.result_desc = payment_response_desc
+#                 db.session.commit()
+#             return {'error': 'Payment failed'}, 400
 
 
 

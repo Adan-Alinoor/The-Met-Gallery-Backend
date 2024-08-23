@@ -989,48 +989,82 @@ class ArtworkCheckoutResource(Resource):
 
 #     return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
-class MpesaCallbackResourceArtwork(Resource):
-    CALLBACK_SECRET = 'your_secret_key_here'  # Replace with your actual secret
+# class MpesaCallbackResourceArtwork(Resource):
+#     CALLBACK_SECRET = 'your_secret_key_here'  # Replace with your actual secret
 
+#     def post(self):
+#         data = request.get_json()
+
+#         if not data:
+#             logging.error("No data received in callback")
+#             return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
+
+#         secret_key = request.headers.get('X-Callback-Secret')
+#         if secret_key != self.CALLBACK_SECRET:
+#             logging.error("Invalid callback secret")
+#             return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
+
+#         try:
+#             stk_callback = data['Body']['stkCallback']
+#             checkout_request_id = stk_callback['CheckoutRequestID']
+#             result_code = stk_callback['ResultCode']
+#             result_desc = stk_callback['ResultDesc']
+#         except KeyError as e:
+#             logging.error(f'Missing key in callback data: {e}')
+#             return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
+
+#         # Log the extracted callback data
+#         logging.debug(f'CheckoutRequestID: {checkout_request_id}')
+#         logging.debug(f'ResultCode: {result_code}')
+#         logging.debug(f'ResultDesc: {result_desc}')
+
+#         payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
+
+#         if payment:
+#             if result_code == 0:
+#                 payment.status = 'complete'
+#                 payment.transaction_desc = result_desc
+#             else:
+#                 payment.status = 'failed'
+#                 payment.transaction_desc = result_desc
+
+#             db.session.commit()
+
+#         return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+
+
+
+class MpesaCallbackResource(Resource):
     def post(self):
-        data = request.get_json()
+        callback_data = request.get_json()
 
-        if not data:
-            logging.error("No data received in callback")
-            return jsonify({"ResultCode": 1, "ResultDesc": "No data received"}), 400
+        logging.debug(f'M-Pesa Callback Data: {callback_data}')
 
-        secret_key = request.headers.get('X-Callback-Secret')
-        if secret_key != self.CALLBACK_SECRET:
-            logging.error("Invalid callback secret")
-            return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback secret"}), 403
+        if not callback_data:
+            return {'error': 'No data received from M-Pesa'}, 400
 
-        try:
-            stk_callback = data['Body']['stkCallback']
-            checkout_request_id = stk_callback['CheckoutRequestID']
-            result_code = stk_callback['ResultCode']
-            result_desc = stk_callback['ResultDesc']
-        except KeyError as e:
-            logging.error(f'Missing key in callback data: {e}')
-            return jsonify({"ResultCode": 1, "ResultDesc": "Invalid data format"}), 400
+        payment_response_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
+        payment_response_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
 
-        # Log the extracted callback data
-        logging.debug(f'CheckoutRequestID: {checkout_request_id}')
-        logging.debug(f'ResultCode: {result_code}')
-        logging.debug(f'ResultDesc: {result_desc}')
+        transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+        payment = Payment.query.filter_by(transaction_id=transaction_id).first()
 
-        payment = Payment.query.filter_by(transaction_id=checkout_request_id).first()
-
-        if payment:
-            if result_code == 0:
-                payment.status = 'complete'
-                payment.transaction_desc = result_desc
+        if payment_response_code == 0:
+            if payment:
+                payment.status = 'completed'
+                payment.result_desc = payment_response_desc
+                db.session.commit()
+                return {'message': 'Payment completed successfully'}, 200
             else:
+                logging.error(f'Payment record not found for transaction_id: {transaction_id}')
+                return {'error': 'Payment record not found'}, 404
+        else:
+            if payment:
                 payment.status = 'failed'
-                payment.transaction_desc = result_desc
+                payment.result_desc = payment_response_desc
+                db.session.commit()
+            return {'error': 'Payment failed', 'description': payment_response_desc}, 400
 
-            db.session.commit()
-
-        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
 
         
