@@ -1034,7 +1034,7 @@ class ArtworkCheckoutResource(Resource):
 
 
 
-class MpesaCallbackResource(Resource):
+class MpesaCallbackResourceArtwork(Resource):
     def post(self):
         callback_data = request.get_json()
 
