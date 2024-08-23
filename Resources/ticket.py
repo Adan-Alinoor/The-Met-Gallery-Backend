@@ -255,9 +255,10 @@ class MpesaCallbackResource(Resource):
         payment_response_code = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultCode')
         payment_response_desc = callback_data.get('Body', {}).get('stkCallback', {}).get('ResultDesc')
 
-        if payment_response_code == '0':
-            transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-            payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+        transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
+        payment = Payment.query.filter_by(transaction_id=transaction_id).first()
+
+        if payment_response_code == 0:
             if payment:
                 payment.status = 'completed'
                 payment.result_desc = payment_response_desc
@@ -267,13 +268,11 @@ class MpesaCallbackResource(Resource):
                 logging.error(f'Payment record not found for transaction_id: {transaction_id}')
                 return {'error': 'Payment record not found'}, 404
         else:
-            transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-            payment = Payment.query.filter_by(transaction_id=transaction_id).first()
             if payment:
                 payment.status = 'failed'
                 payment.result_desc = payment_response_desc
                 db.session.commit()
-            return {'error': 'Payment failed'}, 400
+            return {'error': 'Payment failed', 'description': payment_response_desc}, 400
 
 
 
