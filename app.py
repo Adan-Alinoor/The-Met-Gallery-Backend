@@ -1034,7 +1034,7 @@ class ArtworkCheckoutResource(Resource):
 
 
 
-class MpesaCallbackResourceArtwork(Resource):
+class MpesaCallbackResource(Resource):
     def post(self):
         callback_data = request.get_json()
 
@@ -1049,7 +1049,7 @@ class MpesaCallbackResourceArtwork(Resource):
         transaction_id = callback_data.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
         payment = Payment.query.filter_by(transaction_id=transaction_id).first()
 
-        if payment_response_code == 0:
+        if payment_response_code == 0:  # Success case
             if payment:
                 payment.status = 'completed'
                 payment.result_desc = payment_response_desc
@@ -1058,11 +1058,12 @@ class MpesaCallbackResourceArtwork(Resource):
             else:
                 logging.error(f'Payment record not found for transaction_id: {transaction_id}')
                 return {'error': 'Payment record not found'}, 404
-        else:
+        else:  # Failure case
             if payment:
                 payment.status = 'failed'
                 payment.result_desc = payment_response_desc
                 db.session.commit()
+                logging.warning(f'Payment failed for transaction_id: {transaction_id} with message: {payment_response_desc}')
             return {'error': 'Payment failed', 'description': payment_response_desc}, 400
 
 
