@@ -751,7 +751,7 @@ def create_payment(payment_data):
         "PartyA": payment_data['phone_number'],
         "PartyB": SHORTCODE,
         "PhoneNumber": payment_data['phone_number'],
-        "CallBackURL": "https://the-met-gallery-backend.onrender.com/callback",  
+        "CallBackURL": "https://4a91-102-214-72-2.ngrok-free.app/callback",  
         "AccountReference": f"Order{payment_data.get('order_id')}",
         "TransactionDesc": "Payment for order"
     }
@@ -835,7 +835,7 @@ class ArtworkCheckoutResource(Resource):
             "PartyA": phone_number,
             "PartyB": SHORTCODE,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://the-met-gallery-backend.onrender.com/callback",
+            "CallBackURL": "https://4a91-102-214-72-2.ngrok-free.app/callback",
             "AccountReference": f"Order{order.id}",
             "TransactionDesc": "Payment for order"
         }
