@@ -302,6 +302,72 @@ class UsersResource(Resource):
             'created_at': user.created_at
         } for user in users])
 
+# class UserResource(Resource):
+#     @jwt_required()
+#     def get(self):
+#         user_id = get_jwt_identity()
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'message': 'User not found'}, 404
+        
+#         return jsonify({
+#             'id': user.id,
+#             'username': user.username,
+#             'email': user.email,
+#             'role': user.role,
+#             'created_at': user.created_at
+#         })
+
+#     @jwt_required()
+#     def put(self):
+#         user_id = get_jwt_identity()
+#         user = User.query.get(user_id)
+#         if not user:
+#             return {'message': 'User not found'}, 404
+
+#         args = request.get_json()
+#         if User.query.filter_by(username=args.get('username')).first() and args.get('username') != user.username:
+#             return {'message': 'Username is already taken'}, 400
+
+#         user.username = args.get('username', user.username)
+#         user.email = args.get('email', user.email)
+#         if args.get('password'):
+#             user.password = bcrypt.hashpw(args['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+#         try:
+#             db.session.commit()
+#         except Exception as e:
+#             db.session.rollback()
+#             return {'message': str(e)}, 500
+
+#         return {'message': 'User updated successfully'}, 200
+
+#     @jwt_required()
+#     def delete(self):
+#         try:
+#             current_user_id = get_jwt_identity()
+#             current_user = User.query.get(current_user_id)
+#             user_to_delete_id = request.view_args.get('id')
+#             user_to_delete = User.query.get(user_to_delete_id)
+
+#             if not current_user or not user_to_delete:
+#                 return {'message': 'User not found'}, 404
+
+#             if not current_user.is_admin:
+#                 return {'message': 'Unauthorized access'}, 403
+
+#             if current_user_id == user_to_delete_id:
+#                 return {'message': 'Cannot delete yourself'}, 400
+
+#             db.session.delete(user_to_delete)
+#             db.session.commit()
+#             return {'message': 'User deleted successfully'}, 200
+
+#         except Exception as e:
+#             db.session.rollback()
+#             return {'message': str(e)}, 500
+
+
 class UserResource(Resource):
     @jwt_required()
     def get(self):
@@ -343,12 +409,11 @@ class UserResource(Resource):
         return {'message': 'User updated successfully'}, 200
 
     @jwt_required()
-    def delete(self):
+    def delete(self, id):
         try:
             current_user_id = get_jwt_identity()
             current_user = User.query.get(current_user_id)
-            user_to_delete_id = request.view_args.get('id')
-            user_to_delete = User.query.get(user_to_delete_id)
+            user_to_delete = User.query.get(id)
 
             if not current_user or not user_to_delete:
                 return {'message': 'User not found'}, 404
@@ -356,7 +421,7 @@ class UserResource(Resource):
             if not current_user.is_admin:
                 return {'message': 'Unauthorized access'}, 403
 
-            if current_user_id == user_to_delete_id:
+            if current_user_id == id:
                 return {'message': 'Cannot delete yourself'}, 400
 
             db.session.delete(user_to_delete)
@@ -366,6 +431,7 @@ class UserResource(Resource):
         except Exception as e:
             db.session.rollback()
             return {'message': str(e)}, 500
+
 class AdminResource(Resource):
     @jwt_required()
     @admin_required
