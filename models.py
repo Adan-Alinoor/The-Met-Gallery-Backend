@@ -248,6 +248,7 @@ class Message(db.Model, SerializerMixin):
         self.sender_id = sender_id
         self.recipient_id = recipient_id
         self.content = content
+        self.sent_at = datetime.utcnow()
 
 class UserActivity(db.Model, SerializerMixin):
     __tablename__ = 'user_activities'
