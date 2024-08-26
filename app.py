@@ -1175,13 +1175,12 @@ def send_message():
 class TestMessageCreationResource(Resource):
     def get(self):
         try:
-            # Hardcoded values for testing
             test_message = Message(sender_id=1, recipient_id=2, content="Test message")
             db.session.add(test_message)
             db.session.commit()
-            return jsonify({"success": "Message created successfully!", "message_id": test_message.id}), 201
+            return {"success": "Message created successfully!", "message_id": test_message.id}, 201
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            return {"error": str(e)}, 500
 
 
 
