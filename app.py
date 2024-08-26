@@ -1071,7 +1071,7 @@ class MpesaCallbackResourceArtwork(Resource):
         
 
 @app.route('/messages', methods=['POST'])
-# @jwt_required()
+@jwt_required()
 def send_message():
     data = request.json
     recipient_id = data.get('recipient_id')
