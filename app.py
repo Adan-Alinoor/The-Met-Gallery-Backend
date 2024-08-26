@@ -1175,6 +1175,7 @@ def send_message():
 class TestMessageCreationResource(Resource):
     def get(self):
         try:
+            # Hardcoded values for testing
             test_message = Message(sender_id=1, recipient_id=2, content="Test message")
             db.session.add(test_message)
             db.session.commit()
