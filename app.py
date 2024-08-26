@@ -1071,7 +1071,7 @@ class MpesaCallbackResourceArtwork(Resource):
         
 
 @app.route('/messages', methods=['POST'])
-@jwt_required()
+# @jwt_required()
 def send_message():
     data = request.json
     recipient_id = data.get('recipient_id')
@@ -1087,6 +1087,7 @@ def send_message():
 
     try:
         # Create and save the message
+        print(f"Creating message with sender_id={sender_id}, recipient_id={recipient_id}, content={message_text}")
         new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
         db.session.add(new_message)
         db.session.commit()
