@@ -1119,38 +1119,15 @@ class MpesaCallbackResourceArtwork(Resource):
 #         return jsonify({"error": "An unexpected error occurred while sending the message."}), 500
 
 @app.route('/messages', methods=['POST'])
-@jwt_required()
 def send_message():
-    data = request.json
-    recipient_id = data.get('recipient_id')
-    message_text = data.get('message')
-
-    sender_id = get_jwt_identity()  # This assumes you are using JWT and `sender_id` is stored in the token
-
-    if not sender_id:
-        return jsonify({"error": "Sender ID not found in session."}), 400
-
-    if not recipient_id or not message_text:
-        return jsonify({"error": "Invalid data. Both recipient_id and message are required."}), 400
-
     try:
-        # Debugging: Print the constructor details and arguments
-        print("Message class constructor:", Message.__init__.__annotations__)
-        print(f"sender_id={sender_id}, recipient_id={recipient_id}, content={message_text}")
+        sender_id = 1  # Hardcoded for testing
+        recipient_id = request.json.get('recipient_id')
+        message_text = request.json.get('message')
 
-        # Create and save the message
         new_message = Message(sender_id=sender_id, recipient_id=recipient_id, content=message_text)
         db.session.add(new_message)
         db.session.commit()
-
-        # Emit the new message event to the socket
-        socketio.emit('new_message', {
-            'id': new_message.id,
-            'sender_id': sender_id,
-            'recipient_id': recipient_id,
-            'content': message_text,
-            'sent_at': new_message.sent_at.isoformat()
-        })
 
         return jsonify({
             'id': new_message.id,
@@ -1160,14 +1137,22 @@ def send_message():
             'sent_at': new_message.sent_at.isoformat()
         }), 201
 
-    except SQLAlchemyError as e:
-        db.session.rollback()  # Rollback the session in case of an error
-        print(f"SQLAlchemyError occurred while sending message: {str(e)}")
-        return jsonify({"error": "A database error occurred while sending the message."}), 500
-
     except Exception as e:
-        print(f"Unexpected error occurred while sending the message: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred while sending the message."}), 500
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+# @app.route('/test_message_creation', methods=['GET'])
+# def test_message_creation():
+#     try:
+#         test_message = Message(sender_id=1, recipient_id=2, content="Test message")
+#         db.session.add(test_message)
+#         db.session.commit()
+#         return jsonify({"success": "Message created successfully!"}), 201
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 
 
